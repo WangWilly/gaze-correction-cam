@@ -1,0 +1,3 @@
+# Heavy data: stored on the cloud for efficient development
+weights/
+lm_feat/
