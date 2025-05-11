@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+
 def repeat(x, num_repeats):
     with tf.name_scope("repeat"):
         ones = tf.ones((1, num_repeats), dtype=tf.int32)
@@ -7,16 +8,19 @@ def repeat(x, num_repeats):
         x = tf.matmul(x, ones)
         return tf.reshape(x, [-1])
 
+
 def interpolate(image, x, y, output_size):
     with tf.name_scope("interpolate"):
         batch_size, height, width, num_channels = tf.unstack(tf.shape(image))
-        
+
         x, y = tf.cast(x, tf.float32), tf.cast(y, tf.float32)
-        height_float, width_float = tf.cast(height, tf.float32), tf.cast(width, tf.float32)
-        
+        height_float, width_float = tf.cast(height, tf.float32), tf.cast(
+            width, tf.float32
+        )
+
         x = 0.5 * (x + 1.0) * width_float
         y = 0.5 * (y + 1.0) * height_float
-        
+
         x0 = tf.cast(tf.floor(x), tf.int32)
         x1 = x0 + 1
         y0 = tf.cast(tf.floor(y), tf.int32)
@@ -47,18 +51,28 @@ def interpolate(image, x, y, output_size):
         pixel_values_c = tf.gather(flat_image, indices_c)
         pixel_values_d = tf.gather(flat_image, indices_d)
 
-        x0, x1, y0, y1 = tf.cast(x0, tf.float32), tf.cast(x1, tf.float32), tf.cast(y0, tf.float32), tf.cast(y1, tf.float32)
+        x0, x1, y0, y1 = (
+            tf.cast(x0, tf.float32),
+            tf.cast(x1, tf.float32),
+            tf.cast(y0, tf.float32),
+            tf.cast(y1, tf.float32),
+        )
 
         area_a = tf.expand_dims((x1 - x) * (y1 - y), 1)
         area_b = tf.expand_dims((x1 - x) * (y - y0), 1)
         area_c = tf.expand_dims((x - x0) * (y1 - y), 1)
         area_d = tf.expand_dims((x - x0) * (y - y0), 1)
 
-        output = tf.add_n([area_a * pixel_values_a,
-                           area_b * pixel_values_b,
-                           area_c * pixel_values_c,
-                           area_d * pixel_values_d])
+        output = tf.add_n(
+            [
+                area_a * pixel_values_a,
+                area_b * pixel_values_b,
+                area_c * pixel_values_c,
+                area_d * pixel_values_d,
+            ]
+        )
         return output
+
 
 def meshgrid(height, width):
     with tf.name_scope("meshgrid"):
@@ -69,15 +83,20 @@ def meshgrid(height, width):
         x_coordinates = tf.expand_dims(tf.reshape(x_coordinates, [-1]), 0)
         return tf.concat([x_coordinates, y_coordinates], 0)
 
+
 def apply_transformation(flows, img):
     with tf.name_scope("apply_transformation"):
         batch_size, height, width, num_channels = tf.unstack(tf.shape(img))
         output_size = (height, width)
 
-        flows = tf.reshape(tf.transpose(flows, [0, 3, 1, 2]), [batch_size, -1, height * width])
+        flows = tf.reshape(
+            tf.transpose(flows, [0, 3, 1, 2]), [batch_size, -1, height * width]
+        )
         indices_grid = meshgrid(height, width)
         transformed_grid = flows + indices_grid
         x_s, y_s = tf.unstack(transformed_grid, axis=1)
 
-        transformed_image = interpolate(img, tf.reshape(x_s, [-1]), tf.reshape(y_s, [-1]), output_size)
+        transformed_image = interpolate(
+            img, tf.reshape(x_s, [-1]), tf.reshape(y_s, [-1]), output_size
+        )
         return tf.reshape(transformed_image, [batch_size, height, width, num_channels])
