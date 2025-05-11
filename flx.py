@@ -17,7 +17,7 @@ def gen_agl_map(inputs, height, width, feature_dims):
 
 
 def encoder(inputs, height, width, tar_dim):
-    with tf.variable_scope("encoder"):
+    with tf.compat.v1.variable_scope("encoder"):
         dnn_blk_0 = tf_utils.dnn_blk(inputs, 16, name="dnn_blk_0")
         dnn_blk_1 = tf_utils.dnn_blk(dnn_blk_0, 16, name="dnn_blk_1")
         dnn_blk_2 = tf_utils.dnn_blk(dnn_blk_1, tar_dim, name="dnn_blk_2")
@@ -36,7 +36,7 @@ def apply_lcm(batch_img, light_weight):
 
 
 def trans_module(inputs, structures, phase_train, name="trans_module"):
-    with tf.variable_scope(name) as scope:
+    with tf.compat.v1.variable_scope(name) as scope:
         cnn_blk_0 = tf_utils.cnn_blk(
             inputs,
             structures["depth"][0],
@@ -65,20 +65,19 @@ def trans_module(inputs, structures, phase_train, name="trans_module"):
             phase_train,
             name="cnn_blk_3",
         )
-        cnn_4 = tf.layers.conv2d(
-            inputs=cnn_blk_3,
+        cnn_4 = tf.keras.layers.Conv2D(
             filters=structures["depth"][4],
             kernel_size=structures["filter_size"][4],
             padding="same",
             activation=None,
             use_bias=False,
             name="cnn_4",
-        )
+        )(cnn_blk_3)
         return cnn_4
 
 
 def lcm_module(inputs, structures, phase_train, name="lcm_module"):
-    with tf.variable_scope(name) as scope:
+    with tf.compat.v1.variable_scope(name) as scope:
         cnn_blk_0 = tf_utils.cnn_blk(
             inputs,
             structures["depth"][0],
@@ -93,15 +92,14 @@ def lcm_module(inputs, structures, phase_train, name="lcm_module"):
             phase_train,
             name="cnn_blk_1",
         )
-        cnn_2 = tf.layers.conv2d(
-            inputs=cnn_blk_1,
+        cnn_2 = tf.keras.layers.Conv2D(
             filters=structures["depth"][2],
             kernel_size=structures["filter_size"][2],
             padding="same",
             activation=None,
             use_bias=False,
             name="cnn_2",
-        )
+        )(cnn_blk_1)
         lcm_map = tf.nn.softmax(cnn_2)
         return lcm_map
 
@@ -121,27 +119,27 @@ def inference(input_img, input_fp, input_agl, phase_train, conf):
     }
     lcm_layer = {"depth": (8, 8, 2), "filter_size": ([3, 3], [3, 3], [1, 1])}
 
-    with tf.variable_scope("warping_model"):
+    with tf.compat.v1.variable_scope("warping_model"):
         agl_map = encoder(input_agl, conf.height, conf.width, conf.encoded_agl_dim)
         igt_inputs = tf.concat([input_img, input_fp, agl_map], axis=3)
 
-        with tf.variable_scope("warping_module"):
+        with tf.compat.v1.variable_scope("warping_module"):
             """coarse module"""
-            resized_igt_inputs = tf.layers.average_pooling2d(
-                inputs=igt_inputs, pool_size=[2, 2], strides=2, padding="same"
-            )
+            resized_igt_inputs = tf.keras.layers.AveragePooling2D(
+                pool_size=(2, 2), strides=(2, 2), padding="same"
+            )(igt_inputs)
             cours_raw = trans_module(
                 resized_igt_inputs, corse_layer, phase_train, name="coarse_level"
             )
             cours_act = tf.nn.tanh(cours_raw)
-            coarse_resize = tf.image.resize_images(
+            coarse_resize = tf.image.resize(
                 cours_act,
                 (conf.height, conf.width),
                 method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
             )
-            coarse_out = tf.layers.average_pooling2d(
-                inputs=coarse_resize, pool_size=[2, 2], strides=1, padding="same"
-            )
+            coarse_out = tf.keras.layers.AveragePooling2D(
+                pool_size=(2, 2), strides=(1, 1), padding="same"
+            )(coarse_resize)
             """fine module"""
             fine_input = tf.concat([igt_inputs, coarse_out], axis=3, name="fine_input")
             fine_out = trans_module(
@@ -161,7 +159,7 @@ def inference(input_img, input_fp, input_agl, phase_train, conf):
 
 
 def dist_loss(y_pred, y_, method="MAE"):
-    with tf.variable_scope("img_dist_loss"):
+    with tf.compat.v1.variable_scope("img_dist_loss"):
         loss = 0
         if method == "L2":
             loss = tf.sqrt(
@@ -175,7 +173,7 @@ def dist_loss(y_pred, y_, method="MAE"):
 
 
 def TVloss(inputs):
-    with tf.variable_scope("TVloss"):
+    with tf.compat.v1.variable_scope("TVloss"):
         dinputs_dx = inputs[:, :-1, :, :] - inputs[:, 1:, :, :]
         dinputs_dy = inputs[:, :, :-1, :] - inputs[:, :, 1:, :]
         dinputs_dx = tf.pad(dinputs_dx, [[0, 0], [0, 1], [0, 0], [0, 0]], "CONSTANT")
@@ -186,7 +184,7 @@ def TVloss(inputs):
 
 
 def TVlosses(eye_mask, ori_img, flow, lcm_map):
-    with tf.variable_scope("TVlosses"):
+    with tf.compat.v1.variable_scope("TVlosses"):
         # eyeball_TVloss
         # calculate TV (dFlow(p)/dx  + dFlow(p)/dy)
         TV_flow = TVloss(flow)
@@ -219,7 +217,7 @@ def TVlosses(eye_mask, ori_img, flow, lcm_map):
 
 
 def center_weight(shape, base=0.005, boundary_penalty=3.0):
-    with tf.variable_scope("center_weight"):
+    with tf.compat.v1.variable_scope("center_weight"):
         temp = boundary_penalty - base
         x = tf.pow(tf.abs(tf.lin_space(-1.0, 1.0, shape[1])), 8)
         y = tf.pow(tf.abs(tf.lin_space(-1.0, 1.0, shape[2])), 8)
@@ -238,14 +236,14 @@ def center_weight(shape, base=0.005, boundary_penalty=3.0):
 
 def lcm_adj(lcm_wgt):
     dist2cent = center_weight(tf.shape(lcm_wgt), base=0.005, boundary_penalty=3.0)
-    with tf.variable_scope("lcm_adj"):
+    with tf.compat.v1.variable_scope("lcm_adj"):
         _, loss = tf.split(lcm_wgt, [1, 1], 3)
         loss = tf.reduce_sum(tf.abs(loss) * dist2cent, axis=[1, 2, 3])
         return tf.reduce_mean(loss, axis=0)
 
 
 def loss(img_pred, img_, eye_mask, input_img, flow, lcm_wgt):
-    with tf.variable_scope("losses"):
+    with tf.compat.v1.variable_scope("losses"):
         loss_img = dist_loss(img_pred, img_, method="L2")
 
         loss_eyeball, loss_eyelid, loss_lcm = TVlosses(

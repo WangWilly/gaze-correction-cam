@@ -22,38 +22,23 @@ import math
 
 ################################################################################
 
-conf, _ = get_config()
-if conf.mod == "flx":
-    import flx as model
-else:
-    sys.exit("Wrong Model selection: flx or deepwarp")
-
-################################################################################
-
 # system parameters
 # TODO: the weight is stored in cloud, need to be downloaded
-model_dir = (
-    "./" + conf.weight_set + "/warping_model/" + conf.mod + "/" + str(conf.ef_dim) + "/"
-)
-size_video = [640, 480]
-# fps = 0
-P_IDP = 5
-depth = -50
-
-# for monitoring
-# environment parameter
-win_resloution = (
-    NSScreen.mainScreen().frame().size.width,
-    NSScreen.mainScreen().frame().size.height,
-)
-
-print("Screen resolution: ", win_resloution)
+print("Loading model of [L] eye to GPU")
 
 ################################################################################
 # video receiver
 
 class video_receiver:
     def __init__(self, shared_v, lock):
+        conf, _ = get_config()
+        if conf.mod != "flx":
+            sys.exit("Wrong Model selection: flx or deepwarp")
+
+        size_video = [640, 480]
+
+        ########################################################################
+
         self.face_detect_size = [320, 240]
         self.x_ratio = size_video[0] / self.face_detect_size[0]
         self.y_ratio = size_video[1] / self.face_detect_size[1]
@@ -105,8 +90,8 @@ class video_receiver:
             ]
             break
 
-        # TODO: debug
-        print("coor_remote_head_center: ", coor_remote_head_center)
+        # # TODO: debug: ok
+        # print("coor_remote_head_center: ", coor_remote_head_center)
 
         # share remote participant's eye to the main process
         lock.acquire()
@@ -156,6 +141,31 @@ class video_receiver:
 
 class gaze_redirection_system:
     def __init__(self, shared_v, lock):
+        import flx as model
+
+        ########################################################################
+
+        conf, _ = get_config()
+        if conf.mod != "flx":
+            sys.exit("Wrong Model selection: flx or deepwarp")
+
+        self.conf = conf
+
+        model_dir = (
+            "./" + conf.weight_set + "/warping_model/" + conf.mod + "/" + str(conf.ef_dim) + "/"
+        )
+        
+        self.size_video = [640, 480]
+        self.win_resloution = (
+            NSScreen.mainScreen().frame().size.width,
+            NSScreen.mainScreen().frame().size.height,
+        )
+        
+
+        print("Screen resolution: ", self.win_resloution)
+
+        ########################################################################
+
         # Landmark identifier. Set the filename to whatever you named the downloaded file
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(
@@ -182,20 +192,20 @@ class gaze_redirection_system:
         with tf.Graph().as_default() as g:
             # define placeholder for inputs to network
             with tf.name_scope("inputs"):
-                self.LE_input_img = tf.placeholder(
+                self.LE_input_img = tf.compat.v1.placeholder(
                     tf.float32,
                     [None, conf.height, conf.width, conf.channel],
                     name="input_img",
                 )
-                self.LE_input_fp = tf.placeholder(
+                self.LE_input_fp = tf.compat.v1.placeholder(
                     tf.float32,
                     [None, conf.height, conf.width, conf.ef_dim],
                     name="input_fp",
                 )
-                self.LE_input_ang = tf.placeholder(
+                self.LE_input_ang = tf.compat.v1.placeholder(
                     tf.float32, [None, conf.agl_dim], name="input_ang"
                 )
-                self.LE_phase_train = tf.placeholder(
+                self.LE_phase_train = tf.compat.v1.placeholder(
                     tf.bool, name="phase_train"
                 )  # a bool for batch_normalization
 
@@ -208,15 +218,15 @@ class gaze_redirection_system:
             )
 
             # split modle here
-            self.L_sess = tf.Session(
-                config=tf.ConfigProto(
+            self.L_sess = tf.compat.v1.Session(
+                config=tf.compat.v1.ConfigProto(
                     allow_soft_placement=True, log_device_placement=False
                 ),
                 graph=g,
             )
             # load model
-            saver = tf.train.Saver(tf.global_variables())
-            ckpt = tf.train.get_checkpoint_state(model_dir + "L/")
+            saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables())
+            ckpt = tf.compat.v1.train.get_checkpoint_state(model_dir + "L/")
             if ckpt and ckpt.model_checkpoint_path:
                 # Restores from checkpoint
                 saver.restore(self.L_sess, ckpt.model_checkpoint_path)
@@ -227,20 +237,20 @@ class gaze_redirection_system:
         with tf.Graph().as_default() as g2:
             # define placeholder for inputs to network
             with tf.name_scope("inputs"):
-                self.RE_input_img = tf.placeholder(
+                self.RE_input_img = tf.compat.v1.placeholder(
                     tf.float32,
                     [None, conf.height, conf.width, conf.channel],
                     name="input_img",
                 )
-                self.RE_input_fp = tf.placeholder(
+                self.RE_input_fp = tf.compat.v1.placeholder(
                     tf.float32,
                     [None, conf.height, conf.width, conf.ef_dim],
                     name="input_fp",
                 )
-                self.RE_input_ang = tf.placeholder(
+                self.RE_input_ang = tf.compat.v1.placeholder(
                     tf.float32, [None, conf.agl_dim], name="input_ang"
                 )
-                self.RE_phase_train = tf.placeholder(
+                self.RE_phase_train = tf.compat.v1.placeholder(
                     tf.bool, name="phase_train"
                 )  # a bool for batch_normalization
 
@@ -253,15 +263,15 @@ class gaze_redirection_system:
             )
 
             # split modle here
-            self.R_sess = tf.Session(
-                config=tf.ConfigProto(
+            self.R_sess = tf.compat.v1.Session(
+                config=tf.compat.v1.ConfigProto(
                     allow_soft_placement=True, log_device_placement=False
                 ),
                 graph=g2,
             )
             # load model
-            saver = tf.train.Saver(tf.global_variables())
-            ckpt = tf.train.get_checkpoint_state(model_dir + "R/")
+            saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables())
+            ckpt = tf.compat.v1.train.get_checkpoint_state(model_dir + "R/")
             if ckpt and ckpt.model_checkpoint_path:
                 # Restores from checkpoint
                 saver.restore(self.R_sess, ckpt.model_checkpoint_path)
@@ -272,7 +282,7 @@ class gaze_redirection_system:
 
     def monitor_para(self, frame, fig_alpha, fig_eye_pos, fig_R_w):
         cv2.rectangle(
-            frame, (size_video[0] - 150, 0), (size_video[0], 55), (255, 255, 255), -1
+            frame, (self.size_video[0] - 150, 0), (self.size_video[0], 55), (255, 255, 255), -1
         )
         cv2.putText(
             frame,
@@ -283,7 +293,7 @@ class gaze_redirection_system:
             + ","
             + str(int(fig_eye_pos[2]))
             + "]",
-            (size_video[0] - 140, 15),
+            (self.size_video[0] - 140, 15),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -293,7 +303,7 @@ class gaze_redirection_system:
         cv2.putText(
             frame,
             "alpha:[V=" + str(int(fig_alpha[0])) + ",H=" + str(int(fig_alpha[1])) + "]",
-            (size_video[0] - 140, 30),
+            (self.size_video[0] - 140, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -303,7 +313,7 @@ class gaze_redirection_system:
         cv2.putText(
             frame,
             "R_w:[" + str(int(fig_R_w[0])) + "," + str(int(fig_R_w[1])) + "]",
-            (size_video[0] - 140, 45),
+            (self.size_video[0] - 140, 45),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -383,12 +393,12 @@ class gaze_redirection_system:
             else:
                 raise Exception("Window not found")
         except:
-            Rw_lt = [
-                int(win_resloution[0]) - int(size_window[0] / 2),
-                int(win_resloution[1]) - int(size_window[1] / 2),
-            ]
             size_window = (659, 528)
-            print("Missing the window")
+            Rw_lt = [
+                int(self.win_resloution[0]) - int(size_window[0] / 2),
+                int(self.win_resloution[1]) - int(size_window[1] / 2),
+            ]
+            # TODO: print("Missing the window")
         # get pos head
         pos_remote_head = [int(size_window[0] / 2), int(size_window[1] / 2)]
 
@@ -402,22 +412,22 @@ class gaze_redirection_system:
 
         R_w = (Rw_lt[0] + pos_remote_head[0], Rw_lt[1] + pos_remote_head[1])
         Pw = (
-            self.Ps[0] * (R_w[0] - win_resloution[0] / 2) / win_resloution[0],
-            self.Ps[1] * (R_w[1] - win_resloution[1] / 2) / win_resloution[1],
+            self.Ps[0] * (R_w[0] - self.win_resloution[0] / 2) / self.win_resloution[0],
+            self.Ps[1] * (R_w[1] - self.win_resloution[1] / 2) / self.win_resloution[1],
             0,
         )
 
         # get Pe
-        self.Pe[2] = -(self.f * conf.P_IDP) / np.sqrt(
+        self.Pe[2] = -(self.f * self.conf.P_IDP) / np.sqrt(
             (R_le[0] - R_re[0]) ** 2 + (R_le[1] - R_re[1]) ** 2
         )
         # x-axis needs flip
         self.Pe[0] = (
-            -np.abs(self.Pe[2]) * (R_le[0] + R_re[0] - size_video[0]) / (2 * self.f)
+            -np.abs(self.Pe[2]) * (R_le[0] + R_re[0] - self.size_video[0]) / (2 * self.f)
             + self.Pc[0]
         )
         self.Pe[1] = (
-            np.abs(self.Pe[2]) * (R_le[1] + R_re[1] - size_video[1]) / (2 * self.f)
+            np.abs(self.Pe[2]) * (R_le[1] + R_re[1] - self.size_video[1]) / (2 * self.f)
             + self.Pc[1]
         )
 
@@ -440,8 +450,8 @@ class gaze_redirection_system:
         self, frame, gray, detections, shared_v, lock, pixel_cut=[3, 4], size_I=[48, 64]
     ):
         alpha_w2c = [0, 0]
-        x_ratio = size_video[0] / self.size_df[0]
-        y_ratio = size_video[1] / self.size_df[1]
+        x_ratio = self.size_video[0] / self.size_df[0]
+        y_ratio = self.size_video[1] / self.size_df[1]
         LE_M_A = []
         RE_M_A = []
         p_e = [0, 0]
@@ -553,22 +563,22 @@ class gaze_redirection_system:
 
     def run(self, shared_v, lock):
         # def main():
-        redir = False
+        redir = True
         size_window = [659, 528]
-        vs = cv2.VideoCapture(0)
-        vs.set(3, size_video[0])
-        vs.set(4, size_video[1])
+        vs = cv2.VideoCapture(1)
+        vs.set(3, self.size_video[0])
+        vs.set(4, self.size_video[1])
         t = time.time()
-        cv2.namedWindow(conf.uid)
+        cv2.namedWindow(self.conf.uid)
         cv2.moveWindow(
-            conf.uid,
-            int(win_resloution[0] / 2) - int(size_window[0] / 2),
-            int(win_resloution[1] / 2) - int(size_window[1] / 2),
+            self.conf.uid,
+            int(self.win_resloution[0] / 2) - int(size_window[0] / 2),
+            int(self.win_resloution[1] / 2) - int(size_window[1] / 2),
         )
         while 1:
             ret, recv_frame = vs.read()
             if ret:
-                cv2.imshow(conf.uid, recv_frame)
+                cv2.imshow(self.conf.uid, recv_frame)
                 if recv_frame is not None:
                     # redirected gaze
                     if redir:
@@ -592,7 +602,7 @@ class gaze_redirection_system:
                         data = pickle.dumps("stop")
                         self.client_socket.sendall(struct.pack("L", len(data)) + data)
                         time.sleep(3)
-                        cv2.destroyWindow(conf.uid)
+                        cv2.destroyWindow(self.conf.uid)
                         self.client_socket.shutdown(socket.SHUT_RDWR)
                         self.client_socket.close()
                         vs.release()
@@ -620,11 +630,10 @@ if __name__ == "__main__":
     vs_thread.start()
     # TODO: defer vs_thread.join()
 
-    time.sleep(1)
+    time.sleep(5)
 
-    # gaze_redirection_system()
-    # gz_thread = mp.Process(target=gaze_redirection_system, args=(v, l))
-    # gz_thread.start()
+    gz_thread = mp.Process(target=gaze_redirection_system, args=(v, l))
+    gz_thread.start()
 
     vs_thread.join()    
-    # gz_thread.join()
+    gz_thread.join()
