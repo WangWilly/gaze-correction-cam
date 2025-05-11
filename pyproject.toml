@@ -10,7 +10,8 @@ requires-python = ">=3.12"
 dependencies = [
     "tensorflow (>=2.19.0,<3.0.0)",
     "dlib (>=19.24.8,<20.0.0)",
-    "opencv-python (>=4.11.0.86,<5.0.0.0)"
+    "opencv-python (>=4.11.0.86,<5.0.0.0)",
+    "pyobjc (>=11.0,<12.0)",
 ]
 
 
