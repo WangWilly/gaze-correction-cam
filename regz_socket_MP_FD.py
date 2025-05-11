@@ -47,29 +47,49 @@ win_resloution = (
     NSScreen.mainScreen().frame().size.height,
 )
 
+print("Screen resolution: ", win_resloution)
+
 ################################################################################
 # video receiver
 
-
 class video_receiver:
     def __init__(self, shared_v, lock):
-        self.close = False
-        self.video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("Socket created")
-        #         global remote_head_Center
-        self.video_recv.bind(("", conf.recver_port))
-        self.video_recv.listen(10)
-        print("Socket now listening")
-        self.conn, self.addr = self.video_recv.accept()
+        self.face_detect_size = [320, 240]
+        self.x_ratio = size_video[0] / self.face_detect_size[0]
+        self.y_ratio = size_video[1] / self.face_detect_size[1]
+
+        ########################################################################
+
         # face detection
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(
             "./lm_feat/shape_predictor_68_face_landmarks.dat"
         )
-        self.face_detect_size = [320, 240]
-        self.x_ratio = size_video[0] / self.face_detect_size[0]
-        self.y_ratio = size_video[1] / self.face_detect_size[1]
+        if self.detector is None:
+            print("Error: No face detector found")
+            sys.exit(1)
+        if self.predictor is None:
+            print("Error: No face predictor found")
+            sys.exit(1)
+        
+        print("Face detector and predictor loaded successfully")
+
+        ########################################################################
+
+        self.video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("Socket created")
+        # global remote_head_Center
+        self.video_recv.bind(("", conf.recver_port))
+        self.video_recv.listen(10)
+        print("Socket now listening")
+
+        # If no client connects to the server, the program will hang at the accept() call.
+        # TODO: To avoid this, we can set a timeout for the socket.
+        self.conn, addr = self.video_recv.accept()
+        print("Connection from: ", addr)
         self.start_recv(shared_v, lock)
+
+    ############################################################################
 
     def face_detection(self, frame, shared_v, lock):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -84,11 +104,17 @@ class video_receiver:
                 int((bx.top() + bx.bottom()) * self.y_ratio / 2),
             ]
             break
+
+        # TODO: debug
+        print("coor_remote_head_center: ", coor_remote_head_center)
+
         # share remote participant's eye to the main process
         lock.acquire()
         shared_v[0] = coor_remote_head_center[0]
         shared_v[1] = coor_remote_head_center[1]
         lock.release()
+
+    ############################################################################
 
     def start_recv(self, shared_v, lock):
         data = b""
@@ -97,20 +123,21 @@ class video_receiver:
         while True:
             while len(data) < payload_size:
                 data += self.conn.recv(4096)
-
             packed_msg_size = data[:payload_size]
             data = data[payload_size:]
             msg_size = struct.unpack("L", packed_msg_size)[0]
+
             while len(data) < msg_size:
                 data += self.conn.recv(4096)
-
             frame_data = data[:msg_size]
             data = data[msg_size:]
+
             frame = pickle.loads(frame_data, fix_imports=True, encoding="bytes")
-            if frame == "stop":
-                print("stop")
-                cv2.destroyWindow("Remote")
-                break
+            # TODO:
+            # if frame == "stop":
+            #     print("stop")
+            #     cv2.destroyWindow("Remote")
+            #     break
 
             frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
 
@@ -126,7 +153,6 @@ class video_receiver:
 
 ################################################################################
 # Flx-gaze
-
 
 class gaze_redirection_system:
     def __init__(self, shared_v, lock):
@@ -592,8 +618,13 @@ if __name__ == "__main__":
     # vs_thread = Thread(target=video_receiver, args=(conf.recver_port,))
     vs_thread = mp.Process(target=video_receiver, args=(v, l))
     vs_thread.start()
+    # TODO: defer vs_thread.join()
+
     time.sleep(1)
-    gz_thread = mp.Process(target=gaze_redirection_system, args=(v, l))
-    gz_thread.start()
-    vs_thread.join()
-    gz_thread.join()
+
+    # gaze_redirection_system()
+    # gz_thread = mp.Process(target=gaze_redirection_system, args=(v, l))
+    # gz_thread.start()
+
+    vs_thread.join()    
+    # gz_thread.join()
