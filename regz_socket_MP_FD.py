@@ -1,11 +1,3 @@
-
-# coding: utf-8
-
-# # load package and settings
-
-# In[ ]:
-
-
 import cv2
 import sys
 import dlib
@@ -14,24 +6,25 @@ import socket
 import struct
 import numpy as np
 import tensorflow as tf
-from win32api import GetSystemMetrics
-import win32gui
 
-from threading import Thread, Lock
+from AppKit import NSScreen
+from Quartz import CGWindowListCopyWindowInfo, kCGWindowListOptionOnScreenOnly, kCGNullWindowID
+
+from threading import Thread
 import multiprocessing as mp
 from config import get_config
 import pickle
 import math
 
-
-# In[ ]:
-
+################################################################################
 
 conf,_ = get_config()
 if conf.mod == 'flx':
     import flx as model
 else:
     sys.exit("Wrong Model selection: flx or deepwarp")
+
+################################################################################
 
 # system parameters
 # TODO: the weight is stored in cloud, need to be downloaded
@@ -40,23 +33,14 @@ size_video = [640,480]
 # fps = 0
 P_IDP = 5
 depth = -50
+
 # for monitoring
-
 # environment parameter
-Rs = (GetSystemMetrics(0),GetSystemMetrics(1))
+win_resloution = (NSScreen.mainScreen().frame().size.width, NSScreen.mainScreen().frame().size.height)
 
-
-# In[ ]:
-
-
-model_dir
-print(Rs)
-
-
-# In[ ]:
-
-
+################################################################################
 # video receiver
+
 class video_receiver:
     def __init__(self,shared_v,lock):
         self.close = False
@@ -121,11 +105,8 @@ class video_receiver:
             cv2.imshow('Remote',frame)
             cv2.waitKey(1)
 
-
-# # Flx-gaze 
-
-# In[ ]:
-
+################################################################################
+# Flx-gaze
 
 class gaze_redirection_system:
     def __init__(self,shared_v,lock):
@@ -256,16 +237,19 @@ class gaze_redirection_system:
     def shifting_angles_estimator(self, R_le, R_re,shared_v,lock):
         # get P_w
         try:
-            tar_win = win32gui.FindWindow(None, "Remote")
-            #left, top, reight, bottom
-            Rw_lt = win32gui.GetWindowRect(tar_win)
-            size_window = (Rw_lt[2]-Rw_lt[0], Rw_lt[3]-Rw_lt[1])
+            window_list = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID)
+            tar_win = next((win for win in window_list if win.get('kCGWindowName') == "Remote"), None)
+            if tar_win:
+                Rw_lt = (tar_win['kCGWindowBounds']['X'], tar_win['kCGWindowBounds']['Y'])
+                size_window = (tar_win['kCGWindowBounds']['Width'], tar_win['kCGWindowBounds']['Height'])
+            else:
+                raise Exception("Window not found")
         except:
-            Rw_lt = [int(Rs[0])-int(size_window[0]/2),int(Rs[1])-int(size_window[1]/2)]
-            size_window = (659,528)
+            Rw_lt = [int(win_resloution[0])-int(size_window[0]/2), int(win_resloution[1])-int(size_window[1]/2)]
+            size_window = (659, 528)
             print("Missing the window")
         # get pos head
-        pos_remote_head = [int(size_window[0]/2),int(size_window[1]/2)]
+        pos_remote_head = [int(size_window[0]/2), int(size_window[1]/2)]
         
         try:
             if ((shared_v[0] !=0) & (shared_v[1] !=0)):
@@ -276,7 +260,7 @@ class gaze_redirection_system:
             pos_remote_head = (int(size_window[0]/2),int(size_window[1]/2))
             
         R_w = (Rw_lt[0]+pos_remote_head[0], Rw_lt[1]+pos_remote_head[1])
-        Pw = (self.Ps[0]*(R_w[0]-Rs[0]/2)/Rs[0], self.Ps[1]*(R_w[1]-Rs[1]/2)/Rs[1], 0)
+        Pw = (self.Ps[0]*(R_w[0]-win_resloution[0]/2)/win_resloution[0], self.Ps[1]*(R_w[1]-win_resloution[1]/2)/win_resloution[1], 0)
 
         # get Pe
         self.Pe[2] = -(self.f*conf.P_IDP)/np.sqrt((R_le[0]-R_re[0])**2 + (R_le[1]-R_re[1])**2)
@@ -369,7 +353,7 @@ class gaze_redirection_system:
         vs.set(4, size_video[1])
         t = time.time()
         cv2.namedWindow(conf.uid)
-        cv2.moveWindow(conf.uid, int(Rs[0]/2)-int(size_window[0]/2),int(Rs[1]/2)-int(size_window[1]/2));
+        cv2.moveWindow(conf.uid, int(win_resloution[0]/2)-int(size_window[0]/2),int(win_resloution[1]/2)-int(size_window[1]/2));
         while 1:
             ret, recv_frame = vs.read()
             if ret:
@@ -410,8 +394,7 @@ class gaze_redirection_system:
                     else:
                         pass
 
-
-# In[ ]:
+################################################################################
 
 
 if __name__ == '__main__':
