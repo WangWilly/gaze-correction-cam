@@ -1,8 +1,8 @@
 import argparse
 
 import tensorflow as tf
-import tf_utils
-import transformation
+import tf_models.tf_utils as tf_utils
+import tf_models.transformation as transformation
 
 ################################################################################
 

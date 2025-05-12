@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project implements a gaze correction system for video communication that uses computer vision and deep learning techniques to adjust eye gaze direction in real-time, providing a more natural eye contact experience during video calls.
+This project implements a gaze correction system for video communication that uses computer vision and deep learning techniques to adjust eye gaze direction in real-time, providing a more natural eye contact experience during video calls. ([study more](./docs/orignal_doc.md))
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ The system parameters can be customized in the `config.py` file, including camer
 To start the gaze correction system:
 
 ```bash
-python regz_socket_MP_FD.py
+python bin_regz_socket_MP_FD.py
 ```
 
 ### Controls

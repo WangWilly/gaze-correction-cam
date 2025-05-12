@@ -1,4 +1,4 @@
-from config import get_config
+from utils.config import get_config
 import argparse
 
 import socket

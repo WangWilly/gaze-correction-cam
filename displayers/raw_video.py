@@ -1,4 +1,4 @@
-from config import get_config
+from utils.config import get_config
 import argparse
 
 import socket
@@ -19,7 +19,7 @@ from Quartz import (
 )
 from threading import Thread
 
-import flx as flx_model
+import tf_models.flx as flx_model
 from utils.logger import Logger
 
 
