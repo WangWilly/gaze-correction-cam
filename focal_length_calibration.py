@@ -1,20 +1,9 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # Parameter settings
-
-# In[6]:
-
-
 import dlib
-
-# install dlib by "pip install cmake dlib"
 import cv2
 import numpy as np
 
 
-# In[7]:
-
+################################################################################
 
 # Please place your head in front of the camera about 50 cm
 d = 50  # cm
@@ -34,7 +23,7 @@ predictor = dlib.shape_predictor("./lm_feat/shape_predictor_68_face_landmarks.da
 face_detect_size = [320, 240]
 
 
-# In[8]:
+################################################################################
 
 
 def get_eye_pos(shape, pos="L"):
@@ -65,12 +54,11 @@ def get_eye_pos(shape, pos="L"):
     return eye_center, E_TL, E_RB
 
 
-# # Starting to capture your face, push "q" to leave the program
-
-# In[9]:
+################################################################################
 
 
-vs = cv2.VideoCapture(0)
+# Starting to capture your face, push "q" to leave the program
+vs = cv2.VideoCapture(1)
 
 while True:
     ret, recv_frame = vs.read()
@@ -160,10 +148,8 @@ while True:
             pass
 
 
-# # remember to set the f value to the "config.py"#
-
-# In[10]:
-
+################################################################################
+# TODO: set the f value to the "config.py" after the calibration
 
 print(
     "The focal length of your camera is",

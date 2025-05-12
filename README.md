@@ -11,6 +11,8 @@
 ```bash
 brew install pkg-config
 brew install cmake
+
+poetry install
 ```
 
 ## Run the code
