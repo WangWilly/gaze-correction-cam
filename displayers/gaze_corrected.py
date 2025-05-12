@@ -8,6 +8,7 @@ import dlib
 import sys
 
 from threading import Thread
+from utils.logger import Logger
 
 
 ################################################################################
@@ -15,6 +16,9 @@ from threading import Thread
 
 class GazeCorrectedDisplayer:
     def __init__(self, shared_v, lock):
+        # Initialize logger
+        self.logger = Logger(self.__class__.__name__)
+
         ########################################################################
 
         conf, _ = get_config()
@@ -37,27 +41,27 @@ class GazeCorrectedDisplayer:
             "./lm_feat/shape_predictor_68_face_landmarks.dat"
         )
         if self.detector is None:
-            print("Error: No face detector found")
+            self.logger.log("Error: No face detector found")
             sys.exit(1)
         if self.predictor is None:
-            print("Error: No face predictor found")
+            self.logger.log("Error: No face predictor found")
             sys.exit(1)
 
-        print("Face detector and predictor loaded successfully")
+        self.logger.log("Face detector and predictor loaded successfully")
 
         ########################################################################
 
         self.video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("Socket created")
+        self.logger.log("Socket created")
 
         self.video_recv.bind(("", conf.recver_port))
         self.video_recv.listen(10)
-        print("Socket now listening")
+        self.logger.log("Socket now listening")
 
         # If no client connects to the server, the program will hang at the accept() call.
         # TODO: To avoid this, we can set a timeout for the socket.
         self.conn, addr = self.video_recv.accept()
-        print("Connection from: ", addr)
+        self.logger.log(f"Connection from: {addr}")
         self.start_recv(shared_v, lock)
 
     ############################################################################
@@ -87,7 +91,7 @@ class GazeCorrectedDisplayer:
     def start_recv(self, shared_v, lock):
         data = b""
         payload_size = struct.calcsize("L")
-        print("payload_size: {}".format(payload_size))
+        self.logger.log(f"payload_size: {payload_size}")
         while True:
             while len(data) < payload_size:
                 data += self.conn.recv(4096)
@@ -103,7 +107,7 @@ class GazeCorrectedDisplayer:
             frame = pickle.loads(frame_data, fix_imports=True, encoding="bytes")
             # Check if received a stop command
             if isinstance(frame, bytes) and frame == b"stop":
-                print("Received stop command")
+                self.logger.log("Received stop command")
                 self.cleanup()
                 break
 
@@ -121,13 +125,13 @@ class GazeCorrectedDisplayer:
                     self.cleanup()
                     break
             except Exception as e:
-                print(f"Display error: {e}")
+                self.logger.log(f"Display error: {e}")
                 self.cleanup()
                 break
 
     def cleanup(self):
         """Clean up resources properly"""
-        print("Cleaning up resources...")
+        self.logger.log("Cleaning up resources...")
         try:
             # Close the video window
             cv2.destroyWindow("Remote")
@@ -139,6 +143,6 @@ class GazeCorrectedDisplayer:
             self.conn.shutdown(socket.SHUT_RDWR)
             self.conn.close()
             self.video_recv.close()
-            print("Socket connections closed")
+            self.logger.log("Socket connections closed")
         except Exception as e:
-            print(f"Error while closing socket: {e}")
+            self.logger.log(f"Error while closing socket: {e}")

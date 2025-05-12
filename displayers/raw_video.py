@@ -19,6 +19,7 @@ from Quartz import (
 from threading import Thread
 
 import flx as flx_model
+from utils.logger import Logger
 
 
 ################################################################################
@@ -26,6 +27,9 @@ import flx as flx_model
 
 class RawVideoDisplayer:
     def __init__(self, shared_v, lock):
+        # Initialize logger
+        self.logger = Logger(self.__class__.__name__)
+
         ########################################################################
 
         conf, _ = get_config()
@@ -50,7 +54,7 @@ class RawVideoDisplayer:
             NSScreen.mainScreen().frame().size.height,
         )
 
-        print("Screen resolution: ", self.win_resloution)
+        self.logger.log(f"Screen resolution: {self.win_resloution}")
 
         ########################################################################
         # Landmark identifier. Set the filename to whatever you named the downloaded file
@@ -78,7 +82,7 @@ class RawVideoDisplayer:
         ########################################################################
         # load model to gpu
 
-        print("Loading model of [L] eye to GPU")
+        self.logger.log("Loading model of [L] eye to GPU")
         with tf.Graph().as_default() as g:
             # define placeholder for inputs to network
             with tf.name_scope("inputs"):
@@ -119,9 +123,9 @@ class RawVideoDisplayer:
                 # Restores from checkpoint
                 saver.restore(self.L_sess, ckpt.model_checkpoint_path)
             else:
-                print("No checkpoint file found")
+                self.logger.log("No checkpoint file found")
 
-        print("Loading model of [R] eye to GPU")
+        self.logger.log("Loading model of [R] eye to GPU")
         with tf.Graph().as_default() as g2:
             # define placeholder for inputs to network
             with tf.name_scope("inputs"):
@@ -162,7 +166,7 @@ class RawVideoDisplayer:
                 # Restores from checkpoint
                 saver.restore(self.R_sess, ckpt.model_checkpoint_path)
             else:
-                print("No checkpoint file found")
+                self.logger.log("No checkpoint file found")
 
         self.run(shared_v, lock)
 
@@ -226,7 +230,7 @@ class RawVideoDisplayer:
             rc = 45
             FP_seq = [45, 44, 43, 42, 47, 46]
         else:
-            print("Error: Wrong Eye")
+            self.logger.log("Error: Wrong Eye")
 
         eye_cx = (shape.part(rc).x + shape.part(lc).x) * 0.5
         eye_cy = (shape.part(rc).y + shape.part(lc).y) * 0.5
@@ -294,7 +298,8 @@ class RawVideoDisplayer:
                 int(self.win_resloution[0]) - int(size_window[0] / 2),
                 int(self.win_resloution[1]) - int(size_window[1] / 2),
             ]
-            # TODO: print("Missing the window")
+
+            # TODO: self.logger.log("Missing the window")
         # get pos head
         pos_remote_head = [int(size_window[0] / 2), int(size_window[1] / 2)]
 
@@ -483,10 +488,10 @@ class RawVideoDisplayer:
         while True:
             ret, recv_frame = camera_feed.read()
             if ret == False:
-                print("Error: No frame received from camera.")
+                self.logger.log("Error: No frame received from camera.")
                 break
             if recv_frame is None:
-                print("Error: No frame received from camera.")
+                self.logger.log("Error: No frame received from camera.")
                 break
 
             cv2.imshow(self.conf.uid, recv_frame)
@@ -497,7 +502,8 @@ class RawVideoDisplayer:
             frame = recv_frame.copy()
             try:
                 tag = self.redirect_gaze(frame, shared_v, lock)
-            except:
+            except Exception as e:
+                self.logger.log(f"Error redirecting gaze: {e}")
                 pass
 
             ####################################################################
@@ -510,7 +516,7 @@ class RawVideoDisplayer:
                     data = pickle.dumps(b"stop")
                     self.client_socket.sendall(struct.pack("L", len(data)) + data)
                 except (socket.error, OSError) as e:
-                    print(f"Error sending stop command: {e}")
+                    self.logger.log(f"Error sending stop command: {e}")
 
                 time.sleep(1)
                 cv2.destroyWindow(self.conf.uid)
@@ -528,7 +534,7 @@ class RawVideoDisplayer:
                     finally:
                         self.client_socket.close()
                 except Exception as e:
-                    print(f"Error closing socket: {e}")
+                    self.logger.log(f"Error closing socket: {e}")
 
                 camera_feed.release()
                 self.L_sess.close()
