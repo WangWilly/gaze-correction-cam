@@ -471,7 +471,6 @@ class RawVideoDisplayer:
 
         ########################################################################
 
-        aecTime = time.time()
         cv2.namedWindow(self.conf.uid)
         cv2.moveWindow(
             self.conf.uid,
@@ -481,55 +480,64 @@ class RawVideoDisplayer:
 
         ########################################################################
 
-        while 1:
+        while True:
             ret, recv_frame = camera_feed.read()
-            if ret:
-                cv2.imshow(self.conf.uid, recv_frame)
-                if recv_frame is not None:
-                    frame = recv_frame.copy()
+            if ret == False:
+                print("Error: No frame received from camera.")
+                break
+            if recv_frame is None:
+                print("Error: No frame received from camera.")
+                break
+
+            cv2.imshow(self.conf.uid, recv_frame)
+
+            ####################################################################
+            # face detection
+
+            frame = recv_frame.copy()
+            try:
+                tag = self.redirect_gaze(frame, shared_v, lock)
+            except:
+                pass
+
+            ####################################################################
+            # check if the window is closed
+
+            k = cv2.waitKey(10)
+            if k == ord("q"):
+                try:
+                    # Send stop command to the other side
+                    data = pickle.dumps(b"stop")
+                    self.client_socket.sendall(struct.pack("L", len(data)) + data)
+                except (socket.error, OSError) as e:
+                    print(f"Error sending stop command: {e}")
+
+                time.sleep(1)
+                cv2.destroyWindow(self.conf.uid)
+
+                # Safely close socket
+                try:
+                    # Check if socket is connected before shutdown
                     try:
-                        tag = self.redirect_gaze(frame, shared_v, lock)
-                    except:
+                        # This will raise an error if socket is not connected
+                        self.client_socket.getpeername()
+                        self.client_socket.shutdown(socket.SHUT_RDWR)
+                    except (socket.error, OSError):
+                        # Socket not connected, just close it
                         pass
+                    finally:
+                        self.client_socket.close()
+                except Exception as e:
+                    print(f"Error closing socket: {e}")
 
-                    if (time.time() - aecTime) > 1:
-                        aecTime = time.time()
-
-                    k = cv2.waitKey(10)
-                    if k == ord("q"):
-                        try:
-                            # Send stop command to the other side
-                            data = pickle.dumps(b"stop")
-                            self.client_socket.sendall(struct.pack("L", len(data)) + data)
-                        except (socket.error, OSError) as e:
-                            print(f"Error sending stop command: {e}")
-                            
-                        time.sleep(1)
-                        cv2.destroyWindow(self.conf.uid)
-                        
-                        # Safely close socket
-                        try:
-                            # Check if socket is connected before shutdown
-                            try:
-                                # This will raise an error if socket is not connected
-                                self.client_socket.getpeername()
-                                self.client_socket.shutdown(socket.SHUT_RDWR)
-                            except (socket.error, OSError):
-                                # Socket not connected, just close it
-                                pass
-                            finally:
-                                self.client_socket.close()
-                        except Exception as e:
-                            print(f"Error closing socket: {e}")
-                            
-                        camera_feed.release()
-                        self.L_sess.close()
-                        self.R_sess.close()
-                        break
-                    elif k == ord("r"):
-                        if redir:
-                            redir = False
-                        else:
-                            redir = True
-                    else:
-                        pass
+                camera_feed.release()
+                self.L_sess.close()
+                self.R_sess.close()
+                break
+            # elif k == ord("r"):
+            #     if redir:
+            #         redir = False
+            #     else:
+            #         redir = True
+            else:
+                pass

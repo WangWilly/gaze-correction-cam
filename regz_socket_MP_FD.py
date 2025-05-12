@@ -19,7 +19,7 @@ def main():
 
     gaze_corrected_displayer = mp.Process(target=GazeCorrectedDisplayer, args=(v, l))
     gaze_corrected_displayer.start()
-    time.sleep(5)
+    time.sleep(2)
 
     ############################################################################
     # start the raw video displayer

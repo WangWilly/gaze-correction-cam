@@ -49,7 +49,7 @@ class GazeCorrectedDisplayer:
 
         self.video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print("Socket created")
-        # global remote_head_Center
+
         self.video_recv.bind(("", conf.recver_port))
         self.video_recv.listen(10)
         print("Socket now listening")
@@ -75,9 +75,6 @@ class GazeCorrectedDisplayer:
                 int((bx.top() + bx.bottom()) * self.y_ratio / 2),
             ]
             break
-
-        # # TODO: debug: ok
-        # print("coor_remote_head_center: ", coor_remote_head_center)
 
         # share remote participant's eye to the main process
         lock.acquire()
@@ -120,7 +117,7 @@ class GazeCorrectedDisplayer:
 
             try:
                 cv2.imshow("Remote", frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord("q"):
                     self.cleanup()
                     break
             except Exception as e:
@@ -136,7 +133,7 @@ class GazeCorrectedDisplayer:
             cv2.destroyWindow("Remote")
         except:
             pass
-            
+
         try:
             # Properly shutdown the socket
             self.conn.shutdown(socket.SHUT_RDWR)

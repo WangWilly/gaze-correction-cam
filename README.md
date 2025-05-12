@@ -46,7 +46,6 @@ python regz_socket_MP_FD.py
 
 ### Controls
 
-- Press `r` while focused on the "local" window to toggle gaze correction
 - Press `q` to exit the application
 
 ## System Requirements
