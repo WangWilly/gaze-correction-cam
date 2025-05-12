@@ -497,12 +497,31 @@ class RawVideoDisplayer:
 
                     k = cv2.waitKey(10)
                     if k == ord("q"):
-                        data = pickle.dumps("stop")
-                        self.client_socket.sendall(struct.pack("L", len(data)) + data)
-                        time.sleep(3)
+                        try:
+                            # Send stop command to the other side
+                            data = pickle.dumps(b"stop")
+                            self.client_socket.sendall(struct.pack("L", len(data)) + data)
+                        except (socket.error, OSError) as e:
+                            print(f"Error sending stop command: {e}")
+                            
+                        time.sleep(1)
                         cv2.destroyWindow(self.conf.uid)
-                        self.client_socket.shutdown(socket.SHUT_RDWR)
-                        self.client_socket.close()
+                        
+                        # Safely close socket
+                        try:
+                            # Check if socket is connected before shutdown
+                            try:
+                                # This will raise an error if socket is not connected
+                                self.client_socket.getpeername()
+                                self.client_socket.shutdown(socket.SHUT_RDWR)
+                            except (socket.error, OSError):
+                                # Socket not connected, just close it
+                                pass
+                            finally:
+                                self.client_socket.close()
+                        except Exception as e:
+                            print(f"Error closing socket: {e}")
+                            
                         camera_feed.release()
                         self.L_sess.close()
                         self.R_sess.close()

@@ -104,11 +104,11 @@ class GazeCorrectedDisplayer:
             data = data[msg_size:]
 
             frame = pickle.loads(frame_data, fix_imports=True, encoding="bytes")
-            # # TODO:
-            # if frame == b"stop":
-            #     print("stop")
-            #     cv2.destroyWindow("Remote")
-            #     break
+            # Check if received a stop command
+            if isinstance(frame, bytes) and frame == b"stop":
+                print("Received stop command")
+                self.cleanup()
+                break
 
             frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
 
@@ -118,5 +118,30 @@ class GazeCorrectedDisplayer:
             )
             self.video_recv_hd_thread.start()
 
-            cv2.imshow("Remote", frame)
-            cv2.waitKey(1)
+            try:
+                cv2.imshow("Remote", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    self.cleanup()
+                    break
+            except Exception as e:
+                print(f"Display error: {e}")
+                self.cleanup()
+                break
+
+    def cleanup(self):
+        """Clean up resources properly"""
+        print("Cleaning up resources...")
+        try:
+            # Close the video window
+            cv2.destroyWindow("Remote")
+        except:
+            pass
+            
+        try:
+            # Properly shutdown the socket
+            self.conn.shutdown(socket.SHUT_RDWR)
+            self.conn.close()
+            self.video_recv.close()
+            print("Socket connections closed")
+        except Exception as e:
+            print(f"Error while closing socket: {e}")
