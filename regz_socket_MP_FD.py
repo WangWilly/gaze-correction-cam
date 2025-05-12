@@ -21,13 +21,14 @@ import pickle
 import math
 
 ################################################################################
-
-# system parameters
 # TODO: the weight is stored in cloud, need to be downloaded
-print("Loading model of [L] eye to GPU")
+
+
+print("Warning: This message should not be printed twice.")
 
 ################################################################################
 # video receiver
+
 
 class video_receiver:
     def __init__(self, shared_v, lock):
@@ -56,7 +57,7 @@ class video_receiver:
         if self.predictor is None:
             print("Error: No face predictor found")
             sys.exit(1)
-        
+
         print("Face detector and predictor loaded successfully")
 
         ########################################################################
@@ -139,6 +140,7 @@ class video_receiver:
 ################################################################################
 # Flx-gaze
 
+
 class gaze_redirection_system:
     def __init__(self, shared_v, lock):
         import flx as model
@@ -152,15 +154,20 @@ class gaze_redirection_system:
         self.conf = conf
 
         model_dir = (
-            "./" + conf.weight_set + "/warping_model/" + conf.mod + "/" + str(conf.ef_dim) + "/"
+            "./"
+            + conf.weight_set
+            + "/warping_model/"
+            + conf.mod
+            + "/"
+            + str(conf.ef_dim)
+            + "/"
         )
-        
+
         self.size_video = [640, 480]
         self.win_resloution = (
             NSScreen.mainScreen().frame().size.width,
             NSScreen.mainScreen().frame().size.height,
         )
-        
 
         print("Screen resolution: ", self.win_resloution)
 
@@ -205,15 +212,13 @@ class gaze_redirection_system:
                 self.LE_input_ang = tf.compat.v1.placeholder(
                     tf.float32, [None, conf.agl_dim], name="input_ang"
                 )
-                self.LE_phase_train = tf.compat.v1.placeholder(
-                    tf.bool, name="phase_train"
-                )  # a bool for batch_normalization
+                LE_phase_train = False
 
             self.LE_img_pred, _, _ = model.inference(
                 self.LE_input_img,
                 self.LE_input_fp,
                 self.LE_input_ang,
-                self.LE_phase_train,
+                LE_phase_train,
                 conf,
             )
 
@@ -250,15 +255,13 @@ class gaze_redirection_system:
                 self.RE_input_ang = tf.compat.v1.placeholder(
                     tf.float32, [None, conf.agl_dim], name="input_ang"
                 )
-                self.RE_phase_train = tf.compat.v1.placeholder(
-                    tf.bool, name="phase_train"
-                )  # a bool for batch_normalization
+                RE_phase_train = False
 
             self.RE_img_pred, _, _ = model.inference(
                 self.RE_input_img,
                 self.RE_input_fp,
                 self.RE_input_ang,
-                self.RE_phase_train,
+                RE_phase_train,
                 conf,
             )
 
@@ -282,7 +285,11 @@ class gaze_redirection_system:
 
     def monitor_para(self, frame, fig_alpha, fig_eye_pos, fig_R_w):
         cv2.rectangle(
-            frame, (self.size_video[0] - 150, 0), (self.size_video[0], 55), (255, 255, 255), -1
+            frame,
+            (self.size_video[0] - 150, 0),
+            (self.size_video[0], 55),
+            (255, 255, 255),
+            -1,
         )
         cv2.putText(
             frame,
@@ -423,7 +430,9 @@ class gaze_redirection_system:
         )
         # x-axis needs flip
         self.Pe[0] = (
-            -np.abs(self.Pe[2]) * (R_le[0] + R_re[0] - self.size_video[0]) / (2 * self.f)
+            -np.abs(self.Pe[2])
+            * (R_le[0] + R_re[0] - self.size_video[0])
+            / (2 * self.f)
             + self.Pc[0]
         )
         self.Pe[1] = (
@@ -490,7 +499,6 @@ class gaze_redirection_system:
                     self.LE_input_img: np.expand_dims(LE_img, axis=0),
                     self.LE_input_fp: np.expand_dims(LE_M_A, axis=0),
                     self.LE_input_ang: np.expand_dims(alpha_w2c, axis=0),
-                    self.LE_phase_train: False,
                 },
             )
             LE_infer = cv2.resize(
@@ -504,7 +512,6 @@ class gaze_redirection_system:
                     self.RE_input_img: np.expand_dims(RE_img, axis=0),
                     self.RE_input_fp: np.expand_dims(RE_M_A, axis=0),
                     self.RE_input_ang: np.expand_dims(alpha_w2c, axis=0),
-                    self.RE_phase_train: False,
                 },
             )
             RE_infer = cv2.resize(
@@ -635,5 +642,5 @@ if __name__ == "__main__":
     gz_thread = mp.Process(target=gaze_redirection_system, args=(v, l))
     gz_thread.start()
 
-    vs_thread.join()    
+    vs_thread.join()
     gz_thread.join()

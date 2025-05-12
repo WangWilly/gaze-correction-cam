@@ -3,7 +3,11 @@ import numpy as np
 import tf_utils
 import transformation
 
+################################################################################
+
 img_crop = 3
+
+################################################################################
 
 
 def gen_agl_map(inputs, height, width, feature_dims):
