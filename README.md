@@ -16,7 +16,7 @@ BuildVersion:           24C101
 
 The following dependencies are required to run this application:
 
-- Download trained param files from the github release
+- Download trained param files from [the github release](https://github.com/WangWilly/gaze-correction-cam/releases)
 - [Python 3.12+](https://www.python.org/downloads/)
 - [Poetry](https://python-poetry.org/docs/) for dependency management
 - [CMake](https://cmake.org/download/) (required for building dlib)
