@@ -11,6 +11,7 @@ import time
 import numpy as np
 import tensorflow as tf
 import math
+
 from AppKit import NSScreen
 from Quartz import (
     CGWindowListCopyWindowInfo,
@@ -31,6 +32,7 @@ class RawVideoDisplayerConfig:
         self.mod: str = ""
 
         self.model_dir: str = ""
+        self.predict_param_path: str = "./lm_feat/shape_predictor_68_face_landmarks.dat"
 
         self.f: float = 0.0
         self.Ps: tuple = (0, 0)
@@ -113,9 +115,7 @@ class RawVideoDisplayer:
 
         # Landmark identifier. Set the filename to whatever you named the downloaded file
         self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor(
-            "./lm_feat/shape_predictor_68_face_landmarks.dat"
-        )
+        self.predictor = dlib.shape_predictor(cfg.predict_param_path)
 
         ## start video sender
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

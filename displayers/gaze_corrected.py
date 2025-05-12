@@ -18,6 +18,8 @@ from utils.logger import Logger
 class GazeCorrectedDisplayerConfig:
     def __init__(self):
         # General parameters
+        self.predict_param_path: str = "./lm_feat/shape_predictor_68_face_landmarks.dat"
+
         self.recver_ip = "localhost"
         self.recver_port: int = 5005
 
@@ -62,9 +64,7 @@ class GazeCorrectedDisplayer:
             self.logger.log("Error: No face detector found")
             sys.exit(1)
 
-        self.predictor = dlib.shape_predictor(
-            "./lm_feat/shape_predictor_68_face_landmarks.dat"
-        )
+        self.predictor = dlib.shape_predictor(cfg.predict_param_path)
         if self.predictor is None:
             self.logger.log("Error: No face predictor found")
             sys.exit(1)
