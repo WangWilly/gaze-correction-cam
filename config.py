@@ -1,7 +1,8 @@
-# -*- coding: utf-8 -*-
 import argparse
 
+
 ################################################################################
+
 
 model_config = argparse.ArgumentParser()
 
@@ -30,9 +31,10 @@ model_config.add_argument("--P_c_z", type=eval, default=-1, help="")
 model_config.add_argument("--S_W", type=eval, default=62, help="")
 model_config.add_argument("--S_H", type=eval, default=35, help="")
 
+
 ################################################################################
 
 
-def get_config():
+def get_config() -> tuple[argparse.Namespace, list[str]]:
     config, unparsed = model_config.parse_known_args()
     return config, unparsed

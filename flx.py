@@ -1,3 +1,5 @@
+import argparse
+
 import tensorflow as tf
 import tf_utils
 import transformation
@@ -5,6 +7,24 @@ import transformation
 ################################################################################
 
 img_crop = 3
+
+################################################################################
+
+
+class ModelConfig:
+    def __init__(self):
+        self.height = 48
+        self.width = 64
+        self.encoded_agl_dim = 16
+
+    @classmethod
+    def parse_from(cls, general_cfg: argparse.Namespace) -> "ModelConfig":
+        cfg = cls()
+        cfg.height = general_cfg.height
+        cfg.width = general_cfg.width
+        cfg.encoded_agl_dim = general_cfg.encoded_agl_dim
+        return cfg
+
 
 ################################################################################
 
@@ -107,7 +127,7 @@ def lcm_module(inputs, structures, phase_train, name="lcm_module"):
         return lcm_map
 
 
-def inference(input_img, input_fp, input_agl, phase_train, conf):
+def inference(input_img, input_fp, input_agl, phase_train, conf: ModelConfig):
     """Build the Deepwarp model.
     Args: images, anchors_map of eye, angle
     Returns: lcm images

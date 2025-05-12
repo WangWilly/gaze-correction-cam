@@ -1,4 +1,5 @@
 from config import get_config
+import argparse
 
 import socket
 import struct
@@ -14,6 +15,34 @@ from utils.logger import Logger
 ################################################################################
 
 
+class GazeCorrectedDisplayerConfig:
+    def __init__(self):
+        # General parameters
+        self.recver_ip = "localhost"
+        self.recver_port: int = 5005
+
+        # static parameters
+        self.face_detect_size: list[int] = [320, 240]
+        self.size_video: list[int] = [640, 480]
+        self.x_ratio: float = 0.0
+        self.y_ratio: float = 0.0
+
+    @classmethod
+    def parse_from(
+        cls, general_cfg: argparse.Namespace
+    ) -> "GazeCorrectedDisplayerConfig":
+        cfg = cls()
+        cfg.recver_ip = general_cfg.tar_ip
+        cfg.recver_port = general_cfg.recver_port
+        cfg.x_ratio = cfg.size_video[0] / cfg.face_detect_size[0]
+        cfg.y_ratio = cfg.size_video[1] / cfg.face_detect_size[1]
+
+        return cfg
+
+
+################################################################################
+
+
 class GazeCorrectedDisplayer:
     def __init__(self, shared_v, lock):
         # Initialize logger
@@ -21,28 +50,21 @@ class GazeCorrectedDisplayer:
 
         ########################################################################
 
-        conf, _ = get_config()
-        if conf.mod != "flx":
-            sys.exit("Wrong Model selection: flx or deepwarp")
-
-        size_video = [640, 480]
-
-        ########################################################################
-
-        self.face_detect_size = [320, 240]
-        self.x_ratio = size_video[0] / self.face_detect_size[0]
-        self.y_ratio = size_video[1] / self.face_detect_size[1]
+        general_cfg, _ = get_config()
+        cfg = GazeCorrectedDisplayerConfig.parse_from(general_cfg)
+        self.cfg = cfg
 
         ########################################################################
 
         # face detection
         self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor(
-            "./lm_feat/shape_predictor_68_face_landmarks.dat"
-        )
         if self.detector is None:
             self.logger.log("Error: No face detector found")
             sys.exit(1)
+
+        self.predictor = dlib.shape_predictor(
+            "./lm_feat/shape_predictor_68_face_landmarks.dat"
+        )
         if self.predictor is None:
             self.logger.log("Error: No face predictor found")
             sys.exit(1)
@@ -52,14 +74,9 @@ class GazeCorrectedDisplayer:
         ########################################################################
 
         self.video_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.logger.log("Socket created")
-
-        self.video_recv.bind(("", conf.recver_port))
+        self.video_recv.bind((cfg.recver_ip, cfg.recver_port))
         self.video_recv.listen(10)
         self.logger.log("Socket now listening")
-
-        # If no client connects to the server, the program will hang at the accept() call.
-        # TODO: To avoid this, we can set a timeout for the socket.
         self.conn, addr = self.video_recv.accept()
         self.logger.log(f"Connection from: {addr}")
         self.start_recv(shared_v, lock)
@@ -69,14 +86,14 @@ class GazeCorrectedDisplayer:
     def face_detection(self, frame, shared_v, lock):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         face_detect_gray = cv2.resize(
-            gray, (self.face_detect_size[0], self.face_detect_size[1])
+            gray, (self.cfg.face_detect_size[0], self.cfg.face_detect_size[1])
         )
         detections = self.detector(face_detect_gray, 0)
         coor_remote_head_center = [0, 0]
-        for k, bx in enumerate(detections):
+        for _, bx in enumerate(detections):
             coor_remote_head_center = [
-                int((bx.left() + bx.right()) * self.x_ratio / 2),
-                int((bx.top() + bx.bottom()) * self.y_ratio / 2),
+                int((bx.left() + bx.right()) * self.cfg.x_ratio / 2),
+                int((bx.top() + bx.bottom()) * self.cfg.y_ratio / 2),
             ]
             break
 
@@ -91,7 +108,8 @@ class GazeCorrectedDisplayer:
     def start_recv(self, shared_v, lock):
         data = b""
         payload_size = struct.calcsize("L")
-        self.logger.log(f"payload_size: {payload_size}")
+        # self.logger.log(f"payload_size: {payload_size}")
+
         while True:
             while len(data) < payload_size:
                 data += self.conn.recv(4096)

@@ -1,4 +1,5 @@
 from config import get_config
+import argparse
 
 import socket
 import struct
@@ -25,6 +26,72 @@ from utils.logger import Logger
 ################################################################################
 
 
+class RawVideoDisplayerConfig:
+    def __init__(self) -> None:
+        self.mod: str = ""
+
+        self.model_dir: str = ""
+
+        self.f: float = 0.0
+        self.Ps: tuple = (0, 0)
+        self.Pc: tuple = (0, 0, 0)
+        self.Pe: list = [0, 0, 0]  # H,V,D
+        self.P_IDP: float = 0.0
+
+        self.height = 48
+        self.width = 64
+        self.ef_dim: int = 0
+        self.channel: int = 3
+        self.agl_dim: int = 2
+
+        self.uid: str = ""
+        self.tar_ip = "localhost"
+        self.sender_port = 5005
+
+        # static parameters
+        self.size_video = [640, 480]
+        self.size_df = (320, 240)
+
+    @classmethod
+    def parse_from(cls, general_cfg: argparse.Namespace) -> "RawVideoDisplayerConfig":
+        if general_cfg.mod != "flx":
+            sys.exit("Wrong Model selection: flx or deepwarp")
+
+        cfg = cls()
+        cfg.mod = general_cfg.mod
+
+        cfg.model_dir = (
+            "./"
+            + general_cfg.weight_set
+            + "/warping_model/"
+            + general_cfg.mod
+            + "/"
+            + str(general_cfg.ef_dim)
+            + "/"
+        )
+
+        cfg.f = general_cfg.f
+        cfg.Ps = (general_cfg.S_W, general_cfg.S_H)
+        cfg.Pc = (general_cfg.P_c_x, general_cfg.P_c_y, general_cfg.P_c_z)
+        cfg.Pe = [cfg.Pc[0], cfg.Pc[1], -60]
+        cfg.P_IDP = general_cfg.P_IDP
+
+        cfg.height = general_cfg.height
+        cfg.width = general_cfg.width
+        cfg.ef_dim = general_cfg.ef_dim
+        cfg.channel = general_cfg.channel
+        cfg.agl_dim = general_cfg.agl_dim
+
+        cfg.uid = general_cfg.uid
+        cfg.tar_ip = general_cfg.tar_ip
+        cfg.sender_port = general_cfg.sender_port
+
+        return cfg
+
+
+################################################################################
+
+
 class RawVideoDisplayer:
     def __init__(self, shared_v, lock):
         # Initialize logger
@@ -32,51 +99,28 @@ class RawVideoDisplayer:
 
         ########################################################################
 
-        conf, _ = get_config()
-        if conf.mod != "flx":
-            sys.exit("Wrong Model selection: flx or deepwarp")
+        general_cfg, _ = get_config()
+        cfg = RawVideoDisplayerConfig.parse_from(general_cfg)
 
-        self.conf = conf
-
-        model_dir = (
-            "./"
-            + conf.weight_set
-            + "/warping_model/"
-            + conf.mod
-            + "/"
-            + str(conf.ef_dim)
-            + "/"
-        )
-
-        self.size_video = [640, 480]
+        self.cfg = cfg
         self.win_resloution = (
             NSScreen.mainScreen().frame().size.width,
             NSScreen.mainScreen().frame().size.height,
         )
-
         self.logger.log(f"Screen resolution: {self.win_resloution}")
 
         ########################################################################
-        # Landmark identifier. Set the filename to whatever you named the downloaded file
 
+        # Landmark identifier. Set the filename to whatever you named the downloaded file
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor(
             "./lm_feat/shape_predictor_68_face_landmarks.dat"
         )
-        self.size_df = (320, 240)
-        self.size_I = (48, 64)
-        # initial value
-        self.Rw = [0, 0]
-        self.Pe_z = -60
-        #### get configurations
-        self.f = conf.f
-        self.Ps = (conf.S_W, conf.S_H)
-        self.Pc = (conf.P_c_x, conf.P_c_y, conf.P_c_z)
-        self.Pe = [self.Pc[0], self.Pc[1], self.Pe_z]  # H,V,D
+
         ## start video sender
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.client_socket.connect((conf.tar_ip, conf.sender_port))
+        self.client_socket.connect((cfg.tar_ip, cfg.sender_port))
         self.encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 90]
 
         ########################################################################
@@ -88,25 +132,26 @@ class RawVideoDisplayer:
             with tf.name_scope("inputs"):
                 self.LE_input_img = tf.compat.v1.placeholder(
                     tf.float32,
-                    [None, conf.height, conf.width, conf.channel],
+                    [None, cfg.height, cfg.width, cfg.channel],
                     name="input_img",
                 )
                 self.LE_input_fp = tf.compat.v1.placeholder(
                     tf.float32,
-                    [None, conf.height, conf.width, conf.ef_dim],
+                    [None, cfg.height, cfg.width, cfg.ef_dim],
                     name="input_fp",
                 )
                 self.LE_input_ang = tf.compat.v1.placeholder(
-                    tf.float32, [None, conf.agl_dim], name="input_ang"
+                    tf.float32, [None, cfg.agl_dim], name="input_ang"
                 )
                 LE_phase_train = False
 
+            le_model_cfg = flx_model.ModelConfig.parse_from(general_cfg)
             self.LE_img_pred, _, _ = flx_model.inference(
                 self.LE_input_img,
                 self.LE_input_fp,
                 self.LE_input_ang,
                 LE_phase_train,
-                conf,
+                le_model_cfg,
             )
 
             # split modle here
@@ -118,7 +163,7 @@ class RawVideoDisplayer:
             )
             # load model
             saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables())
-            ckpt = tf.compat.v1.train.get_checkpoint_state(model_dir + "L/")
+            ckpt = tf.compat.v1.train.get_checkpoint_state(cfg.model_dir + "L/")
             if ckpt and ckpt.model_checkpoint_path:
                 # Restores from checkpoint
                 saver.restore(self.L_sess, ckpt.model_checkpoint_path)
@@ -131,25 +176,26 @@ class RawVideoDisplayer:
             with tf.name_scope("inputs"):
                 self.RE_input_img = tf.compat.v1.placeholder(
                     tf.float32,
-                    [None, conf.height, conf.width, conf.channel],
+                    [None, cfg.height, cfg.width, cfg.channel],
                     name="input_img",
                 )
                 self.RE_input_fp = tf.compat.v1.placeholder(
                     tf.float32,
-                    [None, conf.height, conf.width, conf.ef_dim],
+                    [None, cfg.height, cfg.width, cfg.ef_dim],
                     name="input_fp",
                 )
                 self.RE_input_ang = tf.compat.v1.placeholder(
-                    tf.float32, [None, conf.agl_dim], name="input_ang"
+                    tf.float32, [None, cfg.agl_dim], name="input_ang"
                 )
                 RE_phase_train = False
 
+            re_model_cfg = flx_model.ModelConfig.parse_from(general_cfg)
             self.RE_img_pred, _, _ = flx_model.inference(
                 self.RE_input_img,
                 self.RE_input_fp,
                 self.RE_input_ang,
                 RE_phase_train,
-                conf,
+                re_model_cfg,
             )
 
             # split modle here
@@ -161,7 +207,7 @@ class RawVideoDisplayer:
             )
             # load model
             saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables())
-            ckpt = tf.compat.v1.train.get_checkpoint_state(model_dir + "R/")
+            ckpt = tf.compat.v1.train.get_checkpoint_state(cfg.model_dir + "R/")
             if ckpt and ckpt.model_checkpoint_path:
                 # Restores from checkpoint
                 saver.restore(self.R_sess, ckpt.model_checkpoint_path)
@@ -175,8 +221,8 @@ class RawVideoDisplayer:
     def monitor_para(self, frame, fig_alpha, fig_eye_pos, fig_R_w):
         cv2.rectangle(
             frame,
-            (self.size_video[0] - 150, 0),
-            (self.size_video[0], 55),
+            (self.cfg.size_video[0] - 150, 0),
+            (self.cfg.size_video[0], 55),
             (255, 255, 255),
             -1,
         )
@@ -189,7 +235,7 @@ class RawVideoDisplayer:
             + ","
             + str(int(fig_eye_pos[2]))
             + "]",
-            (self.size_video[0] - 140, 15),
+            (self.cfg.size_video[0] - 140, 15),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -199,7 +245,7 @@ class RawVideoDisplayer:
         cv2.putText(
             frame,
             "alpha:[V=" + str(int(fig_alpha[0])) + ",H=" + str(int(fig_alpha[1])) + "]",
-            (self.size_video[0] - 140, 30),
+            (self.cfg.size_video[0] - 140, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -209,7 +255,7 @@ class RawVideoDisplayer:
         cv2.putText(
             frame,
             "R_w:[" + str(int(fig_R_w[0])) + "," + str(int(fig_R_w[1])) + "]",
-            (self.size_video[0] - 140, 45),
+            (self.cfg.size_video[0] - 140, 45),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.4,
             (0, 0, 255),
@@ -313,41 +359,55 @@ class RawVideoDisplayer:
 
         R_w = (Rw_lt[0] + pos_remote_head[0], Rw_lt[1] + pos_remote_head[1])
         Pw = (
-            self.Ps[0] * (R_w[0] - self.win_resloution[0] / 2) / self.win_resloution[0],
-            self.Ps[1] * (R_w[1] - self.win_resloution[1] / 2) / self.win_resloution[1],
+            self.cfg.Ps[0]
+            * (R_w[0] - self.win_resloution[0] / 2)
+            / self.win_resloution[0],
+            self.cfg.Ps[1]
+            * (R_w[1] - self.win_resloution[1] / 2)
+            / self.win_resloution[1],
             0,
         )
 
         # get Pe
-        self.Pe[2] = -(self.f * self.conf.P_IDP) / np.sqrt(
+        self.cfg.Pe[2] = -(self.cfg.f * self.cfg.P_IDP) / np.sqrt(
             (R_le[0] - R_re[0]) ** 2 + (R_le[1] - R_re[1]) ** 2
         )
         # x-axis needs flip
-        self.Pe[0] = (
-            -np.abs(self.Pe[2])
-            * (R_le[0] + R_re[0] - self.size_video[0])
-            / (2 * self.f)
-            + self.Pc[0]
+        self.cfg.Pe[0] = (
+            -np.abs(self.cfg.Pe[2])
+            * (R_le[0] + R_re[0] - self.cfg.size_video[0])
+            / (2 * self.cfg.f)
+            + self.cfg.Pc[0]
         )
-        self.Pe[1] = (
-            np.abs(self.Pe[2]) * (R_le[1] + R_re[1] - self.size_video[1]) / (2 * self.f)
-            + self.Pc[1]
+        self.cfg.Pe[1] = (
+            np.abs(self.cfg.Pe[2])
+            * (R_le[1] + R_re[1] - self.cfg.size_video[1])
+            / (2 * self.cfg.f)
+            + self.cfg.Pc[1]
         )
 
         # calcualte alpha
-        a_w2z_x = math.degrees(math.atan((Pw[0] - self.Pe[0]) / (Pw[2] - self.Pe[2])))
-        a_w2z_y = math.degrees(math.atan((Pw[1] - self.Pe[1]) / (Pw[2] - self.Pe[2])))
+        a_w2z_x = math.degrees(
+            math.atan((Pw[0] - self.cfg.Pe[0]) / (Pw[2] - self.cfg.Pe[2]))
+        )
+        a_w2z_y = math.degrees(
+            math.atan((Pw[1] - self.cfg.Pe[1]) / (Pw[2] - self.cfg.Pe[2]))
+        )
 
         a_z2c_x = math.degrees(
-            math.atan((self.Pe[0] - self.Pc[0]) / (self.Pc[2] - self.Pe[2]))
+            math.atan(
+                (self.cfg.Pe[0] - self.cfg.Pc[0]) / (self.cfg.Pc[2] - self.cfg.Pe[2])
+            )
         )
         a_z2c_y = math.degrees(
-            math.atan((self.Pe[1] - self.Pc[1]) / (self.Pc[2] - self.Pe[2]))
+            math.atan(
+                (self.cfg.Pe[1] - self.cfg.Pc[1]) / (self.cfg.Pc[2] - self.cfg.Pe[2])
+            )
         )
 
         alpha = [int(a_w2z_y + a_z2c_y), int(a_w2z_x + a_z2c_x)]  # (V,H)
 
-        return alpha, self.Pe, R_w
+        return alpha, self.cfg.Pe, R_w
 
     ############################################################################
 
@@ -355,8 +415,8 @@ class RawVideoDisplayer:
         self, frame, gray, detections, shared_v, lock, pixel_cut=[3, 4], size_I=[48, 64]
     ):
         alpha_w2c = [0, 0]
-        x_ratio = self.size_video[0] / self.size_df[0]
-        y_ratio = self.size_video[1] / self.size_df[1]
+        x_ratio = self.cfg.size_video[0] / self.cfg.size_df[0]
+        y_ratio = self.cfg.size_video[1] / self.cfg.size_df[1]
         LE_M_A = []
         RE_M_A = []
         p_e = [0, 0]
@@ -445,7 +505,7 @@ class RawVideoDisplayer:
                 * 255
             )
 
-        frame = self.monitor_para(frame, alpha_w2c, self.Pe, R_w)
+        frame = self.monitor_para(frame, alpha_w2c, self.cfg.Pe, R_w)
 
         result, imgencode = cv2.imencode(".jpg", frame, self.encode_param)
         data = pickle.dumps(imgencode, 0)
@@ -457,7 +517,7 @@ class RawVideoDisplayer:
     def redirect_gaze(self, frame, shared_v, lock):
         # head detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        face_detect_gray = cv2.resize(gray, (self.size_df[0], self.size_df[1]))
+        face_detect_gray = cv2.resize(gray, (self.cfg.size_df[0], self.cfg.size_df[1]))
         detections = self.detector(face_detect_gray, 0)
 
         rg_thread = Thread(
@@ -471,14 +531,14 @@ class RawVideoDisplayer:
     def run(self, shared_v, lock):
         size_window = [659, 528]
         camera_feed = cv2.VideoCapture(1)
-        camera_feed.set(3, self.size_video[0])
-        camera_feed.set(4, self.size_video[1])
+        camera_feed.set(3, self.cfg.size_video[0])
+        camera_feed.set(4, self.cfg.size_video[1])
 
         ########################################################################
 
-        cv2.namedWindow(self.conf.uid)
+        cv2.namedWindow(self.cfg.uid)
         cv2.moveWindow(
-            self.conf.uid,
+            self.cfg.uid,
             int(self.win_resloution[0] / 2) - int(size_window[0] / 2),
             int(self.win_resloution[1] / 2) - int(size_window[1] / 2),
         )
@@ -494,7 +554,7 @@ class RawVideoDisplayer:
                 self.logger.log("Error: No frame received from camera.")
                 break
 
-            cv2.imshow(self.conf.uid, recv_frame)
+            cv2.imshow(self.cfg.uid, recv_frame)
 
             ####################################################################
             # face detection
@@ -519,7 +579,7 @@ class RawVideoDisplayer:
                     self.logger.log(f"Error sending stop command: {e}")
 
                 time.sleep(1)
-                cv2.destroyWindow(self.conf.uid)
+                cv2.destroyWindow(self.cfg.uid)
 
                 # Safely close socket
                 try:
