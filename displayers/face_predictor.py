@@ -23,6 +23,7 @@ class EyeLandmarks:
 
     points: list[tuple[int, int]]  # 6 points for each eye
     center: tuple[float, float]  # Eye center (x, y)
+    iris_points: Optional[list[tuple[float, float, float]]] = None  # 4 iris points with (x, y, z), temporary storage before moving to EyeData
 
 
 @dataclass
@@ -38,6 +39,7 @@ class EyeData:
     original_size: tuple[int, int] # (height, width) before resize
     top_left: tuple[int, int]      # (row, col) position in original frame
     center: tuple[float, float]    # Eye center (x, y) in original frame
+    iris_points: Optional[list[tuple[float, float, float]]] = None  # 4 iris points (x, y, z) for gaze direction computation
 
 
 @dataclass
@@ -309,11 +311,16 @@ class MediaPipeFacePredictor(FacePredictor):
     LEFT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
     RIGHT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
 
-    # TODO: For eye center calculation
-    # LEFT_EYE_CORNERS = (362, 263)
-    # RIGHT_EYE_CORNERS = (33, 133)
+    # Eye center calculation using iris landmarks
+    # Left iris: 473 (center), 474, 475, 476, 477
+    # Right iris: 468 (center), 469, 470, 471, 472
     LEFT_EYE_CORNERS = (474, 476)
     RIGHT_EYE_CORNERS = (471, 469)
+
+    # 4 iris landmarks for computing eye plane normal vector (excluding center)
+    # These form a rough plane around the iris
+    LEFT_IRIS_PLANE_INDICES = [475, 476, 477, 474]  # 4 points around right iris [Top, Right, Bottom, Left]
+    RIGHT_IRIS_PLANE_INDICES = [470, 471, 472, 469] # 4 points around left iris  [Top, Right, Bottom, Left]
 
     def __init__(self, model_path: str = "./models/face_landmarker.task"):
         """
@@ -391,7 +398,14 @@ class MediaPipeFacePredictor(FacePredictor):
             (landmarks[self.LEFT_EYE_CORNERS[0]].x + landmarks[self.LEFT_EYE_CORNERS[1]].x) * w / 2,
             (landmarks[self.LEFT_EYE_CORNERS[0]].y + landmarks[self.LEFT_EYE_CORNERS[1]].y) * h / 2,
         )
-        left_eye = EyeLandmarks(points=left_eye_points, center=left_center)
+        # Extract left iris points for gaze direction (with z coordinate)
+        left_iris_points = [
+            (landmarks[i].x * w, landmarks[i].y * h, landmarks[i].z)
+            for i in self.LEFT_IRIS_PLANE_INDICES
+        ]
+        left_eye = EyeLandmarks(
+            points=left_eye_points, center=left_center, iris_points=left_iris_points
+        )
 
         # Extract right eye landmarks
         right_eye_points = [
@@ -402,7 +416,14 @@ class MediaPipeFacePredictor(FacePredictor):
             (landmarks[self.RIGHT_EYE_CORNERS[0]].x + landmarks[self.RIGHT_EYE_CORNERS[1]].x) * w / 2,
             (landmarks[self.RIGHT_EYE_CORNERS[0]].y + landmarks[self.RIGHT_EYE_CORNERS[1]].y) * h / 2,
         )
-        right_eye = EyeLandmarks(points=right_eye_points, center=right_center)
+        # Extract right iris points for gaze direction (with z coordinate)
+        right_iris_points = [
+            (landmarks[i].x * w, landmarks[i].y * h, landmarks[i].z)
+            for i in self.RIGHT_IRIS_PLANE_INDICES
+        ]
+        right_eye = EyeLandmarks(
+            points=right_eye_points, center=right_center, iris_points=right_iris_points
+        )
 
         return FaceLandmarks(left_eye=left_eye, right_eye=right_eye, raw_shape=landmarks)
 
@@ -488,6 +509,7 @@ class MediaPipeFacePredictor(FacePredictor):
             original_size=ori_size,
             top_left=lt_coord,
             center=eye_landmarks.center,
+            iris_points=eye_landmarks.iris_points,
         )
 
     def list_eye_data(

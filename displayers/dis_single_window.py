@@ -113,6 +113,7 @@ class SingleWindowGazeCorrector:
         # State
         self.gaze_correction_enabled = True
         self.calibration_mode = False
+        self.vector_visualization_enabled = False
         self.camera_id = camera_id
 
         # Store default values for reset
@@ -124,7 +125,7 @@ class SingleWindowGazeCorrector:
         status = "GAZE ON" if self.gaze_correction_enabled else "GAZE OFF"
         color = (0, 255, 0) if self.gaze_correction_enabled else (0, 0, 255)
 
-        cv2.rectangle(frame, (10, 10), (150, 60), (0, 0, 0), -1)
+        cv2.rectangle(frame, (10, 10), (150, 80), (0, 0, 0), -1)
         cv2.putText(
             frame, status, (20, 35),
             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA
@@ -133,6 +134,13 @@ class SingleWindowGazeCorrector:
             frame, f"[{self.face_predictor.get_name()}]", (20, 52),
             cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1, cv2.LINE_AA
         )
+        
+        # Vector visualization status
+        if self.vector_visualization_enabled:
+            cv2.putText(
+                frame, "VECTORS ON", (20, 70),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1, cv2.LINE_AA
+            )
 
     def draw_calibration_overlay(self, frame) -> None:
         """Draw calibration mode overlay with camera offset visualization."""
@@ -337,6 +345,10 @@ class SingleWindowGazeCorrector:
                 display_frame = self.gaze_corrector.apply_correction(
                     display_frame, face_data
                 )
+                
+                # Draw vectors if enabled
+                if self.vector_visualization_enabled:
+                    display_frame = self.gaze_corrector.draw_vectors(display_frame)
             except Exception as e:
                 self.logger.log(f"Error: {e}")
             break  # Only process first face
@@ -351,7 +363,7 @@ class SingleWindowGazeCorrector:
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.display_cfg.video_size[1])
 
         cv2.namedWindow(self.display_cfg.window_name)
-        self.logger.log("Press 'g' to toggle gaze, 'c' for calibration, 'q' to quit")
+        self.logger.log("Press 'g' to toggle gaze, 'c' for calibration, 'v' for vectors, 'q' to quit")
 
         while True:
             ret, frame = cap.read()
@@ -384,6 +396,12 @@ class SingleWindowGazeCorrector:
                 self.calibration_mode = not self.calibration_mode
                 self.logger.log(
                     f"Calibration mode: {'enabled' if self.calibration_mode else 'disabled'}"
+                )
+            elif key == ord("v"):
+                self.vector_visualization_enabled = not self.vector_visualization_enabled
+                self.gaze_corrector.set_vector_visualization(self.vector_visualization_enabled)
+                self.logger.log(
+                    f"Vector visualization: {'enabled' if self.vector_visualization_enabled else 'disabled'}"
                 )
             elif self.calibration_mode:
                 self.handle_calibration_key(key)
