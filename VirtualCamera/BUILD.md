@@ -145,23 +145,16 @@ Note: The built extension won't work as a system extension without proper code s
 
 The virtual camera is designed to work with the Python gaze correction backend:
 
-### Option 1: IPC via Named Pipes (Recommended)
+### Option 1: Run the Single Window Application
 
 ```bash
-# Start the gaze correction backend (from main project directory)
-poetry run python bin_virtual_camera_backend.py --ipc-mode pipe
+# Start the gaze correction application (from main project directory)
+poetry run python bin_single_window.py --backend mediapipe
 
-# The virtual camera extension will automatically connect
+# The virtual camera extension can be extended to communicate with this backend
 ```
 
-### Option 2: IPC via Shared Memory
-
-```bash
-# Start the gaze correction backend with shared memory
-poetry run python bin_virtual_camera_backend.py --ipc-mode shm
-```
-
-### Option 3: Local Processing (MediaPipe Only)
+### Option 2: Local Processing (MediaPipe Only)
 
 The extension can perform basic face detection using MediaPipe directly without the Python backend:
 
@@ -183,8 +176,8 @@ The Settings App allows configuration of:
 | IPD | Inter-pupillary distance (cm) | 6.3 |
 
 Settings are stored in:
-- UserDefaults (for app settings)
-- SQLite database at `~/Library/Application Support/GazeCorrectionCamera/settings.db`
+- UserDefaults with App Group (`group.com.gazecorrection.camera`)
+- Shared between extension and settings app
 
 ## Troubleshooting
 

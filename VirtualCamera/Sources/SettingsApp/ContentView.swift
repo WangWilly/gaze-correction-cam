@@ -186,9 +186,29 @@ class SettingsViewModel: ObservableObject {
     /// Timer for connection check
     private var connectionCheckTimer: Timer?
     
+    /// Keys for tracking if settings have been initialized
+    private let initializedKey = "settingsInitialized"
+    
     init() {
+        // Register defaults for first launch
+        registerDefaults()
         loadSettings()
         startConnectionCheck()
+    }
+    
+    /// Register default values for first-time launch
+    private func registerDefaults() {
+        defaults.register(defaults: [
+            "focalLength": Float(650.0),
+            "ipd": Float(6.3),
+            "cameraOffsetX": Float(0.0),
+            "cameraOffsetY": Float(-21.0),
+            "cameraOffsetZ": Float(-1.0),
+            "gazeEnabled": true,
+            "videoWidth": 1280,
+            "videoHeight": 720,
+            "frameRate": 30
+        ])
     }
     
     /// Load settings from UserDefaults
@@ -202,15 +222,6 @@ class SettingsViewModel: ObservableObject {
         videoWidth = defaults.integer(forKey: "videoWidth")
         videoHeight = defaults.integer(forKey: "videoHeight")
         frameRate = defaults.integer(forKey: "frameRate")
-        
-        // Apply defaults if values are zero
-        if focalLength == 0 { focalLength = 650.0 }
-        if ipd == 0 { ipd = 6.3 }
-        if cameraOffsetY == 0 { cameraOffsetY = -21.0 }
-        if cameraOffsetZ == 0 { cameraOffsetZ = -1.0 }
-        if videoWidth == 0 { videoWidth = 1280 }
-        if videoHeight == 0 { videoHeight = 720 }
-        if frameRate == 0 { frameRate = 30 }
     }
     
     /// Save settings to UserDefaults

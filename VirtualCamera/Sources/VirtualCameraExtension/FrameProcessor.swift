@@ -53,7 +53,7 @@ class FrameProcessor {
     /// Set up observer for settings changes
     private func setupSettingsObserver() {
         NotificationCenter.default.addObserver(
-            forName: UserDefaults.didChangeNotification,
+            forName: SettingsManager.settingsChangedNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -137,6 +137,8 @@ class BackendCommunicator {
     
     /// Initialize the communicator
     init() {
+        // Initial connection check
+        checkBackendConnection()
         setupConnectionCheck()
     }
     

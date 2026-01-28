@@ -288,7 +288,7 @@ struct StatusView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     helpItem(
                         title: "Backend Not Connected",
-                        description: "Start the Python backend with: poetry run python bin_virtual_camera_backend.py"
+                        description: "Start the Python backend with: poetry run python bin_single_window.py --backend mediapipe"
                     )
                     
                     helpItem(

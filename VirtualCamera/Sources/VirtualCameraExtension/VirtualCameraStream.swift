@@ -42,7 +42,9 @@ class VirtualCameraStream: NSObject {
         // Create video format description
         // Default to 1280x720 at 30fps
         let dimensions = CMVideoDimensions(width: 1280, height: 720)
-        let formatDescription = VirtualCameraStream.createFormatDescription(dimensions: dimensions)
+        guard let formatDescription = VirtualCameraStream.createFormatDescription(dimensions: dimensions) else {
+            fatalError("[GazeCorrection] Failed to create video format description")
+        }
         
         self.videoFormat = CMIOExtensionStreamFormat(
             formatDescription: formatDescription,
@@ -73,10 +75,10 @@ class VirtualCameraStream: NSObject {
     }
     
     /// Create a format description for the specified dimensions
-    private static func createFormatDescription(dimensions: CMVideoDimensions) -> CMFormatDescription {
+    private static func createFormatDescription(dimensions: CMVideoDimensions) -> CMFormatDescription? {
         var formatDescription: CMFormatDescription?
         
-        CMVideoFormatDescriptionCreate(
+        let status = CMVideoFormatDescriptionCreate(
             allocator: kCFAllocatorDefault,
             codecType: kCVPixelFormatType_32BGRA,
             width: Int32(dimensions.width),
@@ -85,7 +87,12 @@ class VirtualCameraStream: NSObject {
             formatDescriptionOut: &formatDescription
         )
         
-        return formatDescription!
+        guard status == noErr else {
+            print("[GazeCorrection] Failed to create format description: \(status)")
+            return nil
+        }
+        
+        return formatDescription
     }
     
     /// Start video capture
