@@ -19,7 +19,7 @@ from displayers.face_predictor import (
     EyeExtractionConfig,
     create_face_predictor,
 )
-from displayers.gaze_corrector import GazeCorrector
+from model_managers.gaze_corrector_v1 import GazeCorrector
 
 
 ################################################################################
@@ -95,6 +95,7 @@ class SingleWindowGazeCorrector:
         display_config: Optional[DisplayConfig] = None,
         calibration_config: Optional[CalibrationConfig] = None,
         camera_id: int = 0,
+        config_path: str = "./model_managers/gaze_corrector_v1_01.yaml",
     ):
         self.logger = Logger(self.__class__.__name__)
         self.display_cfg = display_config or DisplayConfig()
@@ -105,7 +106,7 @@ class SingleWindowGazeCorrector:
         self.logger.log(f"Using face predictor: {self.face_predictor.get_name()}")
 
         # Initialize gaze corrector (injectable)
-        self.gaze_corrector = gaze_corrector or GazeCorrector()
+        self.gaze_corrector = gaze_corrector or GazeCorrector(config_path=config_path)
 
         # Eye extraction config (matches model requirements)
         self.eye_config = EyeExtractionConfig()
@@ -333,9 +334,9 @@ class SingleWindowGazeCorrector:
         # Process first detected face
         for face_data in face_data_list:
             try:
-                # Apply gaze correction
+                # Apply gaze correction (pass video_size)
                 display_frame = self.gaze_corrector.apply_correction(
-                    display_frame, face_data
+                    display_frame, face_data, self.display_cfg.video_size
                 )
             except Exception as e:
                 self.logger.log(f"Error: {e}")

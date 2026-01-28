@@ -1,51 +1,32 @@
 """
 TensorFlow Models Package for Gaze Correction
 
-This package provides neural network components for real-time gaze redirection
-in video, based on the DeepWarp approach.
+This package provides versioned gaze correction models.
 
-Modules:
-    - gaze_warp_model: Main gaze correction model architecture
-    - layers: Reusable neural network layer building blocks
-    - spatial_transform: Differentiable image warping operations
-
-Quick Start:
-    >>> from tf_models import gaze_warp_model
-    >>> 
-    >>> config = gaze_warp_model.ModelConfig()
-    >>> with tf.Graph().as_default():
-    ...     pred, flow, lcm = gaze_warp_model.build_inference_graph(
-    ...         eye_image, anchor_points, gaze_angles, is_training=False, config=config
-    ...     )
-
-For backward compatibility, the old module names are also available:
-    - flx (alias for gaze_warp_model)
-    - tf_utils (alias for layers)
-    - transformation (alias for spatial_transform)
+Versions:
+    - gaze_corrector_v1: Initial DeepWarp-based gaze correction model
 """
 
-# New module names (preferred)
-from tf_models import gaze_warp_model
-from tf_models import layers
-from tf_models import spatial_transform
+# Import versioned models
+from tf_models import gaze_corrector_v1
 
-# Model configuration
-from tf_models.gaze_warp_model import ModelConfig
+# Backward compatibility: expose v1 as default
+from tf_models.gaze_corrector_v1 import gaze_warp_model
+from tf_models.gaze_corrector_v1 import layers
+from tf_models.gaze_corrector_v1 import spatial_transform
+from tf_models.gaze_corrector_v1 import ModelConfig
+from tf_models.gaze_corrector_v1 import build_inference_graph
 
-# Key functions for inference
-from tf_models.gaze_warp_model import build_inference_graph
-
-# Backward compatibility aliases
-from tf_models import gaze_warp_model as flx
-from tf_models import layers as tf_utils
-from tf_models import spatial_transform as transformation
+# Additional backward compatibility aliases
+from tf_models.gaze_corrector_v1 import gaze_warp_model as flx
+from tf_models.gaze_corrector_v1 import layers as tf_utils
+from tf_models.gaze_corrector_v1 import spatial_transform as transformation
 
 __all__ = [
-    # New modules
+    "gaze_corrector_v1",
     "gaze_warp_model",
     "layers", 
     "spatial_transform",
-    # Key exports
     "ModelConfig",
     "build_inference_graph",
     # Backward compatibility

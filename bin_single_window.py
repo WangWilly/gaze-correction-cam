@@ -75,6 +75,12 @@ Examples:
         default=0,
         help="Camera device ID (default: 0)",
     )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="./model_managers/gaze_corrector_v1_01.yaml",
+        help="Path to gaze corrector config file (default: ./model_managers/gaze_corrector_v1_01.yaml)",
+    )
     args = parser.parse_args()
 
     # Detect camera resolution
@@ -99,6 +105,7 @@ Examples:
         face_predictor=predictor,
         display_config=display_config,
         camera_id=args.camera,
+        config_path=args.config,
     )
     corrector.run()
 

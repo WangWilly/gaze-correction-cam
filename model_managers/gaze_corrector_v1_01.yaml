@@ -1,0 +1,22 @@
+# Gaze Corrector V1 Configuration
+
+# Model directory containing trained weights
+model_dir: "./weights/warping_model/flx/12/"
+
+# Eye image input size (height, width)
+eye_input_size: [48, 64]
+
+# Number of feature dimensions for eye anchor points
+ef_dim: 12
+
+# Number of image channels (3 for RGB)
+channel: 3
+
+# Gaze warp model hyperparameters
+gaze_warp_model:
+  # Input image dimensions
+  height: 48
+  width: 64
+  
+  # Encoded angle dimension (output of angle encoder)
+  encoded_angle_dim: 16

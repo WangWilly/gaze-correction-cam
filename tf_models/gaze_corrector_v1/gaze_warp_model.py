@@ -26,8 +26,8 @@ from typing import Dict, List, Tuple, Optional
 
 import tensorflow as tf
 
-from tf_models import layers
-from tf_models import spatial_transform
+from tf_models.gaze_corrector_v1 import layers
+from tf_models.gaze_corrector_v1 import spatial_transform
 
 
 ################################################################################
