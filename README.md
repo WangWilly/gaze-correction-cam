@@ -1,5 +1,8 @@
 # Gaze Correction Camera
 
+https://github.com/CVI-SZU/GazeFlow
+https://github.com/eververas/3DGazeNet
+
 ## Overview
 
 This project implements a gaze correction system for video communication that uses computer vision and deep learning techniques to adjust eye gaze direction in real-time, providing a more natural eye contact experience during video calls. ([study more](./docs/orignal_doc.md))

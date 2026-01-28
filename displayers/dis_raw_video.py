@@ -20,7 +20,8 @@ from Quartz import (
 )
 from threading import Thread
 
-import tf_models.flx as flx_model
+# Use new module name with alias for minimal code changes
+from tf_models import gaze_warp_model
 from utils.logger import Logger
 
 
@@ -145,8 +146,8 @@ class RawVideoDisplayer:
                 )
                 LE_phase_train = False
 
-            le_model_cfg = flx_model.ModelConfig.parse_from(general_cfg)
-            self.LE_img_pred, _, _ = flx_model.inference(
+            le_model_cfg = gaze_warp_model.ModelConfig.parse_from(general_cfg)
+            self.LE_img_pred, _, _ = gaze_warp_model.build_inference_graph(
                 self.LE_input_img,
                 self.LE_input_fp,
                 self.LE_input_ang,
@@ -189,8 +190,8 @@ class RawVideoDisplayer:
                 )
                 RE_phase_train = False
 
-            re_model_cfg = flx_model.ModelConfig.parse_from(general_cfg)
-            self.RE_img_pred, _, _ = flx_model.inference(
+            re_model_cfg = gaze_warp_model.ModelConfig.parse_from(general_cfg)
+            self.RE_img_pred, _, _ = gaze_warp_model.build_inference_graph(
                 self.RE_input_img,
                 self.RE_input_fp,
                 self.RE_input_ang,

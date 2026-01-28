@@ -5,6 +5,13 @@ This module provides the gaze correction model wrapper and inference logic,
 decoupled from face detection and eye extraction.
 """
 
+"""
+Gaze Corrector Module
+
+This module provides the gaze correction model wrapper and inference logic,
+decoupled from face detection and eye extraction.
+"""
+
 import math
 import numpy as np
 import tensorflow as tf
@@ -12,7 +19,8 @@ import cv2
 from dataclasses import dataclass
 from typing import Optional
 
-import tf_models.flx as flx_model
+# Use new module name (gaze_warp_model) with alias for minimal code changes
+from tf_models import gaze_warp_model
 from utils.config import get_config
 from utils.logger import Logger
 from displayers.face_predictor import EyeData, FaceData
@@ -68,7 +76,7 @@ class GazeModel:
     def _load_models(self):
         """Load left and right eye models."""
         general_cfg, _ = get_config()
-        model_cfg = flx_model.ModelConfig.parse_from(general_cfg)
+        model_cfg = gaze_warp_model.ModelConfig.parse_from(general_cfg)
 
         # Left eye model
         self.logger.log("Loading left eye model...")
@@ -84,7 +92,7 @@ class GazeModel:
                 )
                 self.le_ang = tf.compat.v1.placeholder(tf.float32, [None, 2])
 
-            self.le_pred, _, _ = flx_model.inference(
+            self.le_pred, _, _ = gaze_warp_model.build_inference_graph(
                 self.le_img, self.le_fp, self.le_ang, False, model_cfg
             )
             self.l_sess = tf.compat.v1.Session(
@@ -107,7 +115,7 @@ class GazeModel:
                 )
                 self.re_ang = tf.compat.v1.placeholder(tf.float32, [None, 2])
 
-            self.re_pred, _, _ = flx_model.inference(
+            self.re_pred, _, _ = gaze_warp_model.build_inference_graph(
                 self.re_img, self.re_fp, self.re_ang, False, model_cfg
             )
             self.r_sess = tf.compat.v1.Session(
