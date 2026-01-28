@@ -109,16 +109,6 @@ The calibration overlay displays:
 - Current focal length (in pixels)
 - Top-view diagram showing camera, screen, and eye positions
 
-### Legacy Multi-Process Application (Deprecated)
-
-The original multi-process application with socket communication is still available but deprecated:
-
-```bash
-poetry run python bin_regz_socket_MP_FD.py
-```
-
-**Note**: This requires additional configuration in `config.py` and is less user-friendly. Use `bin_single_window.py` instead.
-
 ## System Requirements
 
 - macOS with camera access permissions
@@ -144,11 +134,6 @@ This is a **real-time gaze correction system** that redirects eye gaze in video 
   - Calibration mode for camera offset adjustment (`c` key)
   - Supports multiple backends (dlib/MediaPipe)
 - **Flow**: `Camera Input → FacePredictor → GazeCorrector → Display Output`
-
-##### bin_regz_socket_MP_FD.py _(Deprecated)_
-
-- Multi-process version with socket communication
-- More complex, less user-friendly
 
 ##### bin_focal_length_calibration.py
 
