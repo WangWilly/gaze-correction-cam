@@ -437,6 +437,45 @@ Corrected Eye Image
 
 The key innovation is the **learned warping transformation** that realistically redirects gaze while preserving eye appearance, lighting, and texture.
 
+## Virtual Camera (macOS)
+
+A native macOS virtual camera implementation is available using CoreMediaIO Camera Extension. This allows you to use gaze correction with any video conferencing application (Zoom, FaceTime, Google Meet, etc.).
+
+### Components
+
+- **VirtualCameraExtension**: CoreMediaIO Camera Extension that creates a virtual camera device
+- **Settings App**: SwiftUI application for configuring camera settings
+
+### Quick Start
+
+1. Build the virtual camera (requires Xcode 15+):
+   ```bash
+   cd VirtualCamera
+   # See BUILD.md for detailed instructions
+   ```
+
+2. Install the extension via the containing app
+
+3. Approve the extension in System Settings > Privacy & Security > Extensions
+
+4. Start the Python backend (for full gaze correction):
+   ```bash
+   poetry run python bin_single_window.py --backend mediapipe
+   ```
+
+5. Select "Gaze Correction Camera" in your video conferencing app
+
+### Settings
+
+The Settings App provides controls for:
+- Camera offset (X, Y, Z) adjustment
+- Focal length calibration
+- IPD (inter-pupillary distance) setting
+- Gaze correction toggle
+- Video resolution and frame rate
+
+See [`VirtualCamera/BUILD.md`](./VirtualCamera/BUILD.md) for complete build and installation instructions.
+
 ## References
 
 The implementation is based on research in gaze correction techniques using warping-based convolutional neural networks.

@@ -23,6 +23,7 @@ class EyeLandmarks:
 
     points: list[tuple[int, int]]  # 6 points for each eye
     center: tuple[float, float]  # Eye center (x, y)
+    iris_points: Optional[list[tuple[float, float, float]]] = None  # 4 iris points with (x, y, z), temporary storage before moving to EyeData
 
 
 @dataclass
@@ -38,6 +39,16 @@ class EyeData:
     original_size: tuple[int, int] # (height, width) before resize
     top_left: tuple[int, int]      # (row, col) position in original frame
     center: tuple[float, float]    # Eye center (x, y) in original frame
+    iris_points: Optional[list[tuple[float, float, float]]] = None  # 4 iris points (x, y, z) for gaze direction computation
+
+
+@dataclass
+class HeadPose:
+    """Head pose angles in degrees."""
+
+    pitch: float  # Up/down rotation (positive = looking down)
+    yaw: float    # Left/right rotation (positive = looking right)
+    roll: float   # Tilt (positive = tilting right)
 
 
 @dataclass
@@ -47,6 +58,7 @@ class FaceData:
     left_eye: Optional[EyeData]
     right_eye: Optional[EyeData]
     landmarks: Optional["FaceLandmarks"] = None
+    head_pose: Optional[HeadPose] = None
 
 
 @dataclass
@@ -309,11 +321,19 @@ class MediaPipeFacePredictor(FacePredictor):
     LEFT_EYE_INDICES = [362, 385, 387, 263, 373, 380]
     RIGHT_EYE_INDICES = [33, 160, 158, 133, 153, 144]
 
-    # TODO: For eye center calculation
-    # LEFT_EYE_CORNERS = (362, 263)
-    # RIGHT_EYE_CORNERS = (33, 133)
-    LEFT_EYE_CORNERS = (474, 476)
-    RIGHT_EYE_CORNERS = (471, 469)
+    # Eye center calculation using anatomical eye corners (canthus points)
+    # These are FIXED landmarks that don't move with gaze direction
+    # Left eye: inner corner = 362, outer corner = 263
+    # Right eye: inner corner = 133, outer corner = 33
+    LEFT_EYE_CORNERS = (362, 263)   # Inner and outer canthus (stable)
+    RIGHT_EYE_CORNERS = (133, 33)   # Inner and outer canthus (stable)
+
+    # 4 iris landmarks for computing eye plane normal vector (excluding center)
+    # These form a rough plane around the iris
+    # MediaPipe iris indices: Left eye 468-472, Right eye 473-477
+    # Per eye: center, right, top, left, bottom (469/474, 470/475, 471/476, 472/477)
+    LEFT_IRIS_PLANE_INDICES = [470, 469, 472, 471]   # Left iris [Top, Right, Bottom, Left]
+    RIGHT_IRIS_PLANE_INDICES = [475, 474, 477, 476]  # Right iris [Top, Right, Bottom, Left]
 
     def __init__(self, model_path: str = "./models/face_landmarker.task"):
         """
@@ -391,7 +411,14 @@ class MediaPipeFacePredictor(FacePredictor):
             (landmarks[self.LEFT_EYE_CORNERS[0]].x + landmarks[self.LEFT_EYE_CORNERS[1]].x) * w / 2,
             (landmarks[self.LEFT_EYE_CORNERS[0]].y + landmarks[self.LEFT_EYE_CORNERS[1]].y) * h / 2,
         )
-        left_eye = EyeLandmarks(points=left_eye_points, center=left_center)
+        # Extract left iris points for gaze direction (with z coordinate)
+        left_iris_points = [
+            (landmarks[i].x * w, landmarks[i].y * h, landmarks[i].z)
+            for i in self.LEFT_IRIS_PLANE_INDICES
+        ]
+        left_eye = EyeLandmarks(
+            points=left_eye_points, center=left_center, iris_points=left_iris_points
+        )
 
         # Extract right eye landmarks
         right_eye_points = [
@@ -402,9 +429,96 @@ class MediaPipeFacePredictor(FacePredictor):
             (landmarks[self.RIGHT_EYE_CORNERS[0]].x + landmarks[self.RIGHT_EYE_CORNERS[1]].x) * w / 2,
             (landmarks[self.RIGHT_EYE_CORNERS[0]].y + landmarks[self.RIGHT_EYE_CORNERS[1]].y) * h / 2,
         )
-        right_eye = EyeLandmarks(points=right_eye_points, center=right_center)
+        # Extract right iris points for gaze direction (with z coordinate)
+        right_iris_points = [
+            (landmarks[i].x * w, landmarks[i].y * h, landmarks[i].z)
+            for i in self.RIGHT_IRIS_PLANE_INDICES
+        ]
+        right_eye = EyeLandmarks(
+            points=right_eye_points, center=right_center, iris_points=right_iris_points
+        )
 
         return FaceLandmarks(left_eye=left_eye, right_eye=right_eye, raw_shape=landmarks)
+
+    def _estimate_head_pose(
+        self, landmarks, frame_width: int, frame_height: int
+    ) -> Optional[HeadPose]:
+        """
+        Estimate head pose (pitch, yaw, roll) from facial landmarks using solvePnP.
+
+        Args:
+            landmarks: MediaPipe normalized landmarks for a single face
+            frame_width: Frame width in pixels
+            frame_height: Frame height in pixels
+
+        Returns:
+            HeadPose with pitch, yaw, roll in degrees, or None if estimation fails
+        """
+        # 3D model points (generic face model in cm, centered at nose)
+        # These are approximate positions for a generic face
+        model_points = np.array([
+            (0.0, 0.0, 0.0),          # Nose tip
+            (0.0, -3.3, -0.65),       # Chin
+            (-2.25, 1.7, -1.35),      # Left eye outer corner
+            (2.25, 1.7, -1.35),       # Right eye outer corner
+            (-1.5, -1.0, -1.25),      # Left mouth corner
+            (1.5, -1.0, -1.25),       # Right mouth corner
+        ], dtype=np.float64)
+
+        # Corresponding 2D landmark indices in MediaPipe
+        # Nose tip=1, Chin=152, Left eye outer=33, Right eye outer=263,
+        # Left mouth=61, Right mouth=291
+        landmark_indices = [1, 152, 33, 263, 61, 291]
+
+        # Extract 2D image points
+        image_points = np.array([
+            (landmarks[i].x * frame_width, landmarks[i].y * frame_height)
+            for i in landmark_indices
+        ], dtype=np.float64)
+
+        # Camera matrix (approximate, using frame center as principal point)
+        focal_length = frame_width  # Rough approximation
+        camera_matrix = np.array([
+            [focal_length, 0, frame_width / 2],
+            [0, focal_length, frame_height / 2],
+            [0, 0, 1]
+        ], dtype=np.float64)
+
+        # Assume no lens distortion
+        dist_coeffs = np.zeros((4, 1))
+
+        # Solve PnP
+        success, rotation_vector, translation_vector = cv2.solvePnP(
+            model_points, image_points, camera_matrix, dist_coeffs,
+            flags=cv2.SOLVEPNP_ITERATIVE
+        )
+
+        if not success:
+            return None
+
+        # Convert rotation vector to rotation matrix
+        rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
+
+        # Extract Euler angles from rotation matrix
+        # Using the convention: pitch (X), yaw (Y), roll (Z)
+        sy = np.sqrt(rotation_matrix[0, 0] ** 2 + rotation_matrix[1, 0] ** 2)
+        singular = sy < 1e-6
+
+        if not singular:
+            pitch = np.arctan2(rotation_matrix[2, 1], rotation_matrix[2, 2])
+            yaw = np.arctan2(-rotation_matrix[2, 0], sy)
+            roll = np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0])
+        else:
+            pitch = np.arctan2(-rotation_matrix[1, 2], rotation_matrix[1, 1])
+            yaw = np.arctan2(-rotation_matrix[2, 0], sy)
+            roll = 0
+
+        # Convert to degrees
+        pitch_deg = np.degrees(pitch)
+        yaw_deg = np.degrees(yaw)
+        roll_deg = np.degrees(roll)
+
+        return HeadPose(pitch=pitch_deg, yaw=yaw_deg, roll=roll_deg)
 
     def _extract_eye_data(
         self,
@@ -419,7 +533,18 @@ class MediaPipeFacePredictor(FacePredictor):
         right_eye = self._extract_single_eye(
             frame, landmarks.right_eye, "R", config
         )
-        return FaceData(left_eye=left_eye, right_eye=right_eye, landmarks=landmarks)
+
+        # Estimate head pose from raw landmarks
+        head_pose = None
+        if landmarks.raw_shape is not None:
+            try:
+                h, w = frame.shape[:2]
+                head_pose = self._estimate_head_pose(landmarks.raw_shape, w, h)
+            except Exception:
+                # Head pose estimation failed, continue without it
+                head_pose = None
+
+        return FaceData(left_eye=left_eye, right_eye=right_eye, landmarks=landmarks, head_pose=head_pose)
 
     def _extract_single_eye(
         self,
@@ -489,6 +614,7 @@ class MediaPipeFacePredictor(FacePredictor):
             original_size=ori_size,
             top_left=lt_coord,
             center=eye_landmarks.center,
+            iris_points=eye_landmarks.iris_points,
         )
 
     def list_eye_data(
